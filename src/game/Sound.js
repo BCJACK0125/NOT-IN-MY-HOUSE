@@ -214,6 +214,28 @@ export class Sound {
     this.tone(700, 0.45, { type: 'square', vol: 0.025, slide: 1.4 });
     this.tone(980, 0.45, { type: 'square', vol: 0.025, slide: 0.7, delay: 0.45 });
   }
+  /** A rising sweep into a cut (trailer). */
+  riser(dur = 3) {
+    if (!this.ctx) return;
+    this.noise(dur, { freq: 300, sweep: 14, q: 1.2, vol: 0.22, attack: dur * 0.95 });
+    this.tone(110, dur, { type: 'sawtooth', vol: 0.08, slide: 4, attack: dur * 0.9 });
+  }
+
+  /** The big hit under a title card. */
+  boom() {
+    this.tone(40, 3, { type: 'sine', vol: 0.9, slide: 0.6 });
+    this.noise(2.2, { freq: 90, q: 0.5, vol: 0.8, type: 'lowpass' });
+    this.noise(1.2, { freq: 2400, sweep: 0.2, q: 0.7, vol: 0.18 });
+  }
+
+  /** Fade everything (music and effects) toward `level` over `time` seconds. */
+  duck(level, time = 0.3) {
+    if (!this.master) return;
+    const now = this.ctx.currentTime;
+    this.master.gain.cancelScheduledValues(now);
+    this.master.gain.setTargetAtTime(this.muted ? 0 : this.volume * level, now, time / 3);
+  }
+
   sting() {
     // the title hit
     this.tone(55, 2.5, { type: 'sawtooth', vol: 0.18, slide: 0.5 });
@@ -256,9 +278,12 @@ export class Sound {
   /** Called every frame. Schedules the fight layer a beat ahead. */
   update(dt) {
     if (!this.ctx || !this.drone) return;
-    this._intensity += (this.intensity - this._intensity) * Math.min(1, dt * 0.8);
+    // A director (the trailer) can hold the score where it wants it.
+    const goal = this.override ?? this.intensity;
+    const calm = this.calmOverride ?? this.calm;
+    this._intensity += (goal - this._intensity) * Math.min(1, dt * (this.override !== undefined && this.override !== null ? 2.5 : 0.8));
     const now = this.ctx.currentTime;
-    this.drone.gain.setTargetAtTime(this.calm ? 0.08 : 0.32 - this._intensity * 0.1, now, 0.5);
+    this.drone.gain.setTargetAtTime(calm ? 0.08 : 0.32 - this._intensity * 0.1, now, 0.5);
     this.fight.gain.setTargetAtTime(this._intensity * 0.9, now, 0.3);
     const bpm = 132;
     const beat = 60 / bpm / 2;

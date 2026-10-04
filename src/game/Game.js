@@ -818,7 +818,7 @@ export class Game {
       const inside = (app.enemies.player.zone !== 'outside' || app.character.position.x > 6.5 * K && app.character.position.z < 13.45 * K) && !this.showOutside && this.mode !== 'title' ? 1 : 0;
       this.indoor += (inside - this.indoor) * Math.min(1, raw * 3);
     }
-    this.slamRing.update(dt, settings.judgement.shock);
+    this.slamRing.update(dt, this._slamLook ??= { ...settings.judgement.shock, color: '#ff4a14', crackColor: '#ffb36b' });
     const pos = app.character.position;
 
     // pickups

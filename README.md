@@ -6,7 +6,7 @@
 
 瀏覽器裡的第三人稱 3D 動作遊戲。場景重建自真實的家（[Mi Casa es Su Casa](https://github.com/BCJACK0125/Mi-Casa-es-Su-Casa)），角色、戰鬥與特效建立在 [Samurai Third-Person Template](https://github.com/achrefelouafi/SamuraiThirdPersonTemplateThreeJS) 上。
 
-▶ 預告片（3 分鐘，有聲）：[`media/trailer.mp4`](media/trailer.mp4)，標題畫面的「▶ 預告片」也能直接看。遊戲中的前導片與章節過場都是即時演算，可按住 Enter / Esc 跳過。
+▶ 預告片（2 分 22 秒，有聲）：[`media/trailer.mp4`](media/trailer.mp4)，標題畫面的「▶ 預告片」也能直接看。遊戲中的前導片與章節過場都是即時演算，可按住 Enter / Esc 跳過。
 
 ## 怎麼玩
 
@@ -106,6 +106,8 @@ tools/record-trailer.cjs  用 Playwright 開 Chrome 執行上面的導演並存�
 ### 重新錄製預告片
 
 預告片是用遊戲本身錄的（不是另外剪的素材）：導演腳本控制劇情與自動戰鬥，頁面把 WebGL 畫面、字幕／黑邊／標題卡和 WebAudio 混音一起送進 MediaRecorder，所以聲音和畫面同步。
+
+剪輯依照劇情型遊戲預告片的常見結構：冷開場（電梯停電）→ 世界（黑雨與影）→ 我家（徒手、取刀、燃燒的刀、天罰）→ 升級（陽台攀爬、樓梯間、廣場快剪：滑斬、影分身、萬劍、見切）→ 高潮（黑潮之母）→ 靜默一拍、硬切片名 → 黎明。每次換場都藏在字卡、黑幕或打擊閃白底下；配樂是一條連續、逐幕推高的音軌。自動駕駛出招前會正面對準目標（招式自帶吸附踏步），並在可取消的時間點接下一招形成連段；開錄前會先把所有特效跑一次，避免錄影中途因編譯著色器而卡頓。
 
 ```bash
 python -m http.server 8137

@@ -21,6 +21,7 @@ const { chromium } = require(process.argv[3] || 'playwright');
   });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+  page.on('console', (m) => { if (m.text().startsWith('[autopilot]')) console.log(m.text()); });
   fs.writeFileSync(out, Buffer.alloc(0));
   let bytes = 0;
   await page.exposeFunction('__saveChunk', (b64) => {
