@@ -171,8 +171,9 @@ export function buildHouse(scene) {
   place(L, Fu.waterHeater(), 0.75, 9.96, N, { y: 1.55 });
   place(L, Fu.washbasinShelf(), 0.32, 9.82, N, { solid: [0.4, 0.3, 1.0] });
   place(L, Fu.openShelf({ w: 0.4, h: 0.75, d: 0.3, mat: cm('#e3cf8c', 0.6), levels: 2 }), 0.85, 9.82, N, { solid: [0.4, 0.3, 0.75] });
-  place(L, Fu.storageBin('#f3f3ef'), 0.95, 8.75, E, { solid: [0.55, 0.4, 0.4] });
-  place(L, Fu.storageBin('#a9c6e3'), 0.95, 9.2, E, { solid: [0.55, 0.4, 0.4] });
+  // bins stacked beside the closed glass leaf, out of the doorway
+  place(L, Fu.storageBin('#f3f3ef'), 0.98, 7.12, E, { solid: [0.55, 0.4, 0.4] });
+  place(L, Fu.storageBin('#a9c6e3'), 0.98, 7.66, E, { solid: [0.55, 0.4, 0.4] });
   place(L, Fu.clothesLine(3.8, ['#1a1a1a', '#c94f4f', '#e8e8e8', '#5b6c8f', '#f0e6d8', '#222']), 0.9, 8.1, 0, { y: 2.38 });
   place(L, Fu.domeLight(0.15, M.bulb), 0.65, 8.1, 0, { y: H });
   light('balcony', 0.65, 2.5, 8.1, { color: '#ffd9a8', intensity: 3, distance: 5 });

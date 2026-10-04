@@ -590,11 +590,20 @@ export class Enemy {
       this.vx *= k;
       this.vz *= k;
     }
+    const ox = pos.x;
+    const oz = pos.z;
     pos.x += this.vx * dt;
     pos.z += this.vz * dt;
     m.separate(this);
     m.world.collide(pos, this.radius, pos.y, 1.6 * this.size);
-    const ground = m.world.heightAt(pos.x, pos.z, pos.y + 0.35);
+    let ground = m.world.heightAt(pos.x, pos.z, pos.y + 0.35);
+    if (ground < pos.y - 1.2) {
+      // never off a balcony or down a stairwell gap
+      pos.x = ox;
+      pos.z = oz;
+      this.vx = this.vz = 0;
+      ground = m.world.heightAt(pos.x, pos.z, pos.y + 0.35);
+    }
     pos.y += (ground - pos.y) * Math.min(1, dt * 14);
     if (Math.abs(ground - pos.y) < 0.01) pos.y = ground;
 

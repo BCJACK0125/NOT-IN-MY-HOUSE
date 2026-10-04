@@ -425,9 +425,32 @@ export class App {
       const prevX = position.x;
       const prevZ = position.z;
       this.controller.update(dt);
-      this.world.collide(position, 0.34, position.y, 1.7);
+      // Swept, not teleported: a dash or a warp can cover most of a metre in
+      // one slow frame, which is enough to step clean through a railing. The
+      // move is replayed in short steps, colliding after each.
+      const tx = position.x;
+      const tz = position.z;
+      const span = Math.hypot(tx - prevX, tz - prevZ);
+      const steps = Math.max(1, Math.ceil(span / 0.12));
+      position.x = prevX;
+      position.z = prevZ;
+      for (let i = 1; i <= steps; i++) {
+        position.x += (tx - prevX) / steps;
+        position.z += (tz - prevZ) / steps;
+        this.world.collide(position, 0.34, position.y, 1.7);
+      }
       this.enemies.pushOut(position, 0.36);
       this.world.collide(position, 0.34, position.y, 1.7);
+      // Nothing in this game is a ledge you can step off: if the ground under
+      // the new spot is a storey below, the step is refused.
+      if (!(this.character.flight?.active)) {
+        const below = this.world.heightAt(position.x, position.z, position.y + 0.4);
+        if (below < position.y - 1.2) {
+          position.x = prevX;
+          position.z = prevZ;
+          this.controller.velocity.set(0, 0);
+        }
+      }
       if (dt > 0) game.moved(Math.hypot(position.x - prevX, position.z - prevZ));
     }
     const groundY = this.world.heightAt(position.x, position.z, position.y + 0.4);
