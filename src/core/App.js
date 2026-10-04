@@ -512,7 +512,7 @@ export class App {
     // Camera on real time.
     this.cam.update(raw, position);
     // Hide the body when the lens is inside it.
-    this.character.root.visible = this.cam.closeness > 0.7;
+    this.character.root.visible = this.cam.closeness > 0.7 && !game.hidePlayer;
     this.lightPool.update(this.cam.shot ? this.cam.camera.position : position.clone().setY(position.y + 1.5), this.elapsed);
     this.sound.update(raw);
 

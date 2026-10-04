@@ -29,7 +29,7 @@ body {
   text-shadow: 0 0 18px rgba(255, 90, 30, 0.55), 0 0 2px rgba(255, 200, 150, 0.9);
   margin: 0;
 }
-.brand--big { font-size: clamp(48px, 9vw, 118px); line-height: 0.92; }
+.brand--big { font-size: clamp(44px, min(9vw, 12vh), 118px); line-height: 0.92; }
 .loader { background: radial-gradient(ellipse at 50% 60%, #1a0f0b 0%, var(--soot) 70%); }
 .loader__title.brand { font-size: 34px; }
 .loader__bar i { background: linear-gradient(90deg, #8a1e0e, var(--ember), var(--ember-hot)); }
@@ -47,6 +47,7 @@ body {
   text-align: center;
 }
 .screen--dim { background: rgba(4, 4, 6, 0.78); backdrop-filter: blur(4px); z-index: 50; }
+.screen--solid { background: rgba(4, 4, 6, 0.95); }
 .screen--red { background: radial-gradient(ellipse at center, rgba(90, 0, 0, 0.55), rgba(5, 0, 0, 0.92)); z-index: 45; animation: fadein 1.2s ease; }
 .screen--dawn { background: linear-gradient(180deg, rgba(255, 190, 130, 0.25), rgba(10, 8, 14, 0.85) 70%); z-index: 45; animation: fadein 2s ease; }
 .screen__hint { opacity: 0.6; font-size: 14px; }
@@ -56,9 +57,12 @@ body {
 .title__glow { position: absolute; left: -10vw; bottom: -20vh; width: 70vw; height: 70vh; background: radial-gradient(ellipse, rgba(255, 80, 20, 0.25), transparent 65%); pointer-events: none; }
 .title__inner { position: relative; text-align: left; max-width: 560px; }
 .title__kicker { letter-spacing: 0.4em; color: var(--ember-hot); font-size: 14px; margin: 0 0 10px; }
-.title__tag { font-family: var(--serif); font-size: 22px; margin: 14px 0 28px; color: #f4dcc8; }
+.title__tag { font-family: var(--serif); font-size: 22px; margin: 12px 0 22px; color: #f4dcc8; }
 .title__buttons { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.title__opts { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; opacity: 0.85; }
+.title__row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.btn--small { min-width: 0; font-size: 14px; padding: 8px 18px; }
+#title { overflow-y: auto; }
+.title__opts { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; opacity: 0.85; }
 .title__opts select { background: #15110f; color: var(--paper); border: 1px solid #5a3a2a; padding: 4px 6px; font-family: var(--font); }
 .title__foot { position: absolute; bottom: 18px; left: 7vw; font-size: 12px; opacity: 0.45; margin: 0; }
 
@@ -249,3 +253,24 @@ body.touch-ui .skip-hint__btn { display: inline-block; background: rgba(0, 0, 0,
   .chapter-card b { font-size: 34px; }
 }
 #viewport { touch-action: none; }
+
+/* ---- chapter select --------------------------------------------------- */
+.chapters { width: min(980px, 94vw); text-align: left; }
+.chapters__head { font-family: var(--serif); color: var(--ember-hot); letter-spacing: 0.3em; margin: 0 0 18px; }
+.chapters__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.chapter { position: relative; text-align: left; padding: 18px 16px 16px; min-height: 170px; border: 1px solid rgba(255, 120, 60, 0.35); background: linear-gradient(160deg, rgba(60, 20, 10, 0.85), rgba(12, 10, 10, 0.92)); color: var(--paper); font-family: var(--font); cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; overflow: hidden; }
+.chapter:hover:not(:disabled) { transform: translateY(-4px); border-color: var(--ember); box-shadow: 0 10px 30px rgba(255, 80, 20, 0.25); }
+.chapter__no { position: absolute; right: 10px; top: 4px; font-family: var(--display); font-size: 44px; color: rgba(255, 140, 80, 0.16); }
+.chapter__small { font-family: var(--serif); letter-spacing: 0.3em; font-size: 12px; color: var(--ember-hot); }
+.chapter__title { font-family: var(--serif); font-size: 26px; }
+.chapter__desc { font-size: 13px; line-height: 1.6; opacity: 0.8; margin-top: auto; }
+.chapter.is-locked { cursor: not-allowed; filter: grayscale(1); opacity: 0.45; }
+.chapters__note { font-size: 13px; opacity: 0.6; margin: 16px 0 12px; }
+@media (max-height: 520px) {
+  .chapters__head { margin-bottom: 8px; font-size: 18px; }
+  .chapters__list { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .chapter { min-height: 120px; padding: 10px; }
+  .chapter__title { font-size: 18px; }
+  .chapter__desc { font-size: 11px; }
+  .chapters__note { margin: 8px 0; }
+}

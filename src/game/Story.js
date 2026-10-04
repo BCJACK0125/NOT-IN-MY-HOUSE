@@ -106,12 +106,15 @@ export function buildSteps(g) {
     {
       id: 'sword',
       chapter: '第一章　我家',
+      checkpoint: true,
       tags: ['home1'],
+      spawn: { pos: P(7.35, 11.3), yaw: Math.PI, pitch: 0.2 },
       objective: (g) => `找到爺爺的刀（主臥室衣櫃）[F]` + (g.alive('home1') ? `　·　客廳有 ${g.alive('home1')} 隻影` : ''),
-      enter(g) {
+      enter(g, { retry } = {}) {
+        L.lift.target = 1;
         L.frontDoor.toggle(true);
-        g.chapter('第一章', '我　家');
-        g.later(1.2, () => g.say('連家裡都被闖進來了。……爺爺的刀還在衣櫃裡。', 4));
+        if (retry) g.later(0.8, () => g.say('爺爺的刀還在主臥室的衣櫃裡。', 3));
+        else g.later(0.05, () => introHome(g));
         g.spawn('shade', { ...xz(P(8.0, 8.4)), y: y8, crouch: true, yaw: 0.4 }, 'home1');
         g.spawn('shade', { ...xz(P(9.8, 9.5)), y: y8, yaw: 3.6 }, 'home1');
         g.spawn('shade', { ...xz(P(5.45, 4.4)), y: y8, yaw: 0 }, 'home1');
@@ -233,11 +236,11 @@ export function buildSteps(g) {
       tags: ['stairs'],
       spawn: { pos: P(7.6, 11.9), yaw: Math.PI / 2, pitch: 0.25 },
       objective: (g) => `從樓梯間下樓：${g.floorLabel()} → 1F`,
-      enter(g) {
+      enter(g, { retry } = {}) {
         L.lift.target = 1;
         L.frontDoor.toggle(true);
-        g.chapter('第二章', '樓 梯 間');
-        g.later(1.0, () => g.say('電梯沒電了。只能走樓梯，一層一層殺下去。', 4));
+        if (retry) g.later(0.8, () => g.say('一層一層殺下去。', 3));
+        else g.later(0.05, () => introStairs(g));
         const S = (kind, u, w, f, dy, extra = {}) => g.spawn(kind, { ...xz(P(u, w, f)), y: floorY(f) + dy * KY, ...extra }, 'stairs');
         S('shade', 7.5, 12.6, 7, 0);
         S('shade', 11.1, 11.5, 6, 1.5);
@@ -260,9 +263,10 @@ export function buildSteps(g) {
       checkpoint: true,
       spawn: { pos: P(7.45, 12.0, 1), yaw: 0, pitch: 0.2 },
       objective: '衝出大樓',
-      enter(g) {
+      enter(g, { retry } = {}) {
         L.van.on = true;
-        g.say('1 樓。玻璃門碎了一地。外面就是廣場。', 3.5);
+        if (retry) g.say('外面就是廣場。', 3);
+        else g.later(0.05, () => introOutside(g));
       },
       done: () => app.character.position.z > 13.7 * K
     },
@@ -274,8 +278,7 @@ export function buildSteps(g) {
       objective: (g) => `殺出一條血路到救援車（剩 ${g.alive('crowd') + g.alive('wave2')}）`,
       enter(g) {
         L.van.on = true;
-        g.chapter('最終章', '樓　外');
-        g.later(1.2, () => g.say('救援車還在等！撐過去！', 3));
+        g.later(0.6, () => g.say('救援車還在等！撐過去！', 3));
         g.flags.wave2 = false;
         for (const [x, z] of [[-6, 8], [-20, 26], [8, 38], [-30, 40], [-12, 50]]) g.addPickup(x, 0, z, 30);
       },
@@ -324,8 +327,16 @@ export function buildSteps(g) {
             sub: '地面在震動……', enter: () => { app.cam.shake(0.3); app.sound.slam(); }
           },
           {
-            dur: 3.6, from: [v3(B.x + 6, 0.8, B.z - 5), v3(B.x, 2.5, B.z)], to: [v3(B.x + 5, 0.6, B.z - 4), v3(B.x, 4.2, B.z)],
-            sub: '<em>黑潮之母</em>——所有影的源頭。', enter: () => spawnBoss()
+            dur: 4.2, from: [v3(B.x + 6, 0.8, B.z - 5), v3(B.x, 2.5, B.z)], to: [v3(B.x + 5, 0.6, B.z - 4), v3(B.x, 4.2, B.z)],
+            sub: '<em>黑潮之母</em>——所有影的源頭。', subAt: 1.2, enter: () => spawnBoss()
+          },
+          {
+            dur: 4.5,
+            follow: (k) => {
+              const p = app.character.position;
+              return [v3(p.x + 3.5 - k, p.y + 2.6 + k * 0.6, p.z - 4.5), v3((p.x + B.x) / 2, 2.2, (p.z + B.z) / 2)];
+            },
+            subs: [[0.3, '黑雨是從它身上落下來的。'], [2.4, '殺了它——<em>天就會亮</em>。']]
           }
         ], (skipped) => {
           if (!g.boss) spawnBoss();
@@ -489,23 +500,37 @@ export function buildSteps(g) {
   /** Into the van, up into the morning. */
   function ending(g) {
     const v = new Vector3(VAN.x, 0, VAN.z);
-    const this2 = {};
+    const van = L.van.group;
+    const vanStart = van.position.clone();
+    g.hidePlayer = true;
     g.cinematic([
       {
-        dur: 3.5, from: [v3(v.x + 6, 2, v.z - 8), v3(v.x, 1.4, v.z)], to: [v3(v.x + 5, 2.4, v.z - 6), v3(v.x, 1.6, v.z)],
-        sub: '「……你回來了。」媽的聲音在發抖。'
+        dur: 4.5, from: [v3(v.x + 6, 2, v.z - 8), v3(v.x, 1.4, v.z)], to: [v3(v.x + 5, 2.4, v.z - 6), v3(v.x, 1.6, v.z)],
+        subs: [[0.3, '車門打開。'], [1.8, '「……你回來了。」媽的聲音在發抖。']]
       },
       {
-        dur: 7, from: [v3(v.x + 4, 3, v.z - 6), v3(v.x, 2, v.z)], to: [v3(5, 48, -10), v3(8, 12, 14)],
-        sub: '家，不只是一間房子。', subAt: 0.6,
-        tick: (k) => { if (k > 0.55 && !this2.a) { this2.a = 1; g.ui.subtitle('是值得你<em>殺出一條血路</em>，也要回去的地方。'); } }
+        dur: 5.5, from: [v3(-14, 1.4, 22), v3(0.5, y8 + 1.6, 12)], to: [v3(-12, 1.6, 20), v3(0.5, y8 + 1.2, 12)],
+        subs: [[0.4, '回頭看，8 樓的陽台被晨光照亮了。'], [3.0, '晾著的衣服，還在風裡晃。']]
       },
       {
-        dur: 3, from: [v3(5, 48, -10), v3(8, 12, 14)], to: [v3(4, 52, -14), v3(8, 14, 14)],
+        dur: 6.5, from: [v3(v.x - 9, 2.2, v.z - 10), v3(v.x, 1.2, v.z + 2)], to: [v3(v.x - 7, 2.6, v.z - 4), v3(v.x, 1.2, v.z + 14)],
+        enter: () => app.sound.siren(),
+        tick: (k) => { van.position.z = vanStart.z + k * k * 22; },
+        subs: [[0.6, '救援車駛出廣場。'], [3.2, '家，不只是一間房子。']]
+      },
+      {
+        dur: 7.5, from: [v3(v.x - 4, 4, v.z - 6), v3(v.x, 2, v.z + 10)], to: [v3(5, 52, -12), v3(8, 12, 14)],
+        tick: (k) => { van.position.z = vanStart.z + 22 + k * 30; },
+        subs: [[0.8, '是值得你<em>殺出一條血路</em>，'], [3.6, '也一定要回去的地方。']]
+      },
+      {
+        dur: 3, from: [v3(5, 52, -12), v3(8, 12, 14)], to: [v3(4, 56, -16), v3(8, 14, 14)],
         enter: () => g.ui.fade(true, true)
       }
     ], () => {
       g.mode = 'ending';
+      g.hidePlayer = false;
+      van.position.copy(vanStart);
       app.cam.unlock();
       g.ui.fade(false, true);
       g.ui.hud(false);
@@ -513,4 +538,106 @@ export function buildSteps(g) {
       try { localStorage.removeItem('nimh.save.v1'); } catch { /* ignore */ }
     }, { skippable: true });
   }
+
+  /** 序章 → 第一章: the front door opens on a home that is not empty. */
+  function introHome(g) {
+    const p = app.character.position.clone();
+    const lr = P(8.0, 8.4);
+    const glow = P(4.25, 4.7, HOME_FLOOR, 1.05);
+    const homeLights = L.lights.filter((a) => a.zone === 'home');
+    const base = homeLights.map((a) => a.flicker);
+    g.cinematic([
+      {
+        dur: 4.2, from: [v3(p.x + 0.5, y8 + 1.9, p.z + 1.9), v3(p.x - 0.2, y8 + 1.4, p.z - 2.5)], to: [v3(p.x + 0.3, y8 + 1.8, p.z + 1.2), v3(p.x - 0.3, y8 + 1.3, p.z - 3)],
+        enter: () => { app.sound.door(); app.sound.metal(); },
+        subs: [[0.4, '鐵門上全是抓痕。'], [2.2, '……門，沒有鎖。']]
+      },
+      {
+        dur: 6, from: [v3(10.9, y8 + 1.7, 16.2), v3(lr.x, y8 + 0.9, lr.z)], to: [v3(11.3, y8 + 1.6, 14.8), v3(lr.x, y8 + 0.7, lr.z)],
+        enter: () => { for (const a of homeLights) a.flicker = Math.max(a.flicker, 0.7); },
+        subs: [[0.5, '這是我長大的地方。'], [3.0, '……現在，<em>它們在我家</em>。']]
+      },
+      {
+        dur: 4.2, from: [v3(lr.x + 1.8, y8 + 1.1, lr.z + 1.5), v3(lr.x, y8 + 0.6, lr.z)], to: [v3(lr.x + 1.3, y8 + 0.9, lr.z + 1.1), v3(lr.x, y8 + 0.7, lr.z)],
+        enter: () => app.sound.growl(),
+        subs: [[1.2, '它蹲在客廳的地上，像在吃什麼東西。']]
+      },
+      {
+        dur: 5, from: [v3(8.6, y8 + 1.9, 9.8), v3(glow.x, glow.y, glow.z)], to: [v3(8.0, y8 + 1.7, 8.8), v3(glow.x, glow.y, glow.z)],
+        subs: [[0.4, '主臥室的衣櫃縫裡，有光。'], [2.6, '爺爺的刀……還在那裡。']]
+      }
+    ], () => {
+      homeLights.forEach((a, i) => { a.flicker = base[i]; });
+      g.chapter('第一章', '我　家');
+    });
+  }
+
+  /** 第一章 → 第二章: the quiet after, and the long way down. */
+  function introStairs(g) {
+    const y6 = floorY(6);
+    g.cinematic([
+      {
+        dur: 5.5, from: [v3(11.2, y8 + 1.6, 13.8), v3(12.5, y8 + 2.0, 9.9)], to: [v3(14.2, y8 + 1.6, 13.4), v3(12.5, y8 + 2.0, 9.9)], ease: 'linear',
+        enter: () => { g.cullY = y8; },
+        subs: [[0.4, '家裡終於安靜了。'], [2.8, '爸爸最喜歡的八駿圖，還好好地掛在牆上。']]
+      },
+      {
+        dur: 4.5, from: [v3(-1.0, y8 + 3.0, 12.0), v3(-16, 0, 16)], to: [v3(-1.6, y8 + 3.2, 13.0), v3(-22, 0, 26)],
+        enter: () => { g.showOutside = true; },
+        subs: [[0.5, '樓下的廣場，媽她們在等我。']]
+      },
+      {
+        dur: 5.5, from: [v3(12.0, y8 + 2.8, 17.2), v3(16.4, y8 - 2.2, 18.0)], to: [v3(12.6, y8 + 2.2, 17.1), v3(16.6, y8 - 3.2, 18.2)],
+        enter: () => { g.showOutside = false; g.cullY = y8 - 3; },
+        subs: [[0.4, '電梯沒電。只能走樓梯。'], [2.8, '八層樓，一層一層往下。']]
+      },
+      {
+        dur: 5, from: [v3(13.6, y6 + 1.9, 19.1), v3(16.7, y6 + 2.1, 17.9)], to: [v3(14.1, y6 + 2.0, 19.0), v3(16.7, y6 + 2.3, 17.9)],
+        enter: () => { g.cullY = y6 + 1; app.sound.growl(); },
+        subs: [[0.6, '每一層，<em>都有東西在等我</em>。']]
+      }
+    ], () => {
+      g.cullY = null;
+      g.showOutside = false;
+      g.chapter('第二章', '樓 梯 間');
+    });
+  }
+
+  /** 第二章 → 最終章: out through the broken glass, into all of them. */
+  function introOutside(g) {
+    const y1 = floorY(1);
+    g.cinematic([
+      {
+        dur: 4.2, from: [v3(11.7, y1 + 1.6, 16.6), v3(11.2, y1 + 1.1, 21.5)], to: [v3(11.5, y1 + 1.4, 17.3), v3(11.2, y1 + 1.0, 22.5)],
+        subs: [[0.4, '1 樓。大門的玻璃碎了一地。']]
+      },
+      {
+        dur: 5.5, from: [v3(11.4, 3.3, 22.4), v3(-6, 1, 28)], to: [v3(9.2, 3.8, 23.4), v3(-14, 1, 36)],
+        enter: () => { g.showOutside = true; },
+        subs: [[0.5, '外面是廣場——還有全部的影。']]
+      },
+      {
+        dur: 4.5, from: [v3(-4, 2.2, 34), v3(VAN.x, 1.4, VAN.z)], to: [v3(-6, 2.0, 37), v3(VAN.x, 1.6, VAN.z)],
+        enter: () => app.sound.siren(),
+        subs: [[0.4, '救援車的警示燈還在閃。'], [2.4, '她們還在等。']]
+      },
+      {
+        dur: 4.5, from: [v3(-11, 0.9, 17.5), v3(-14, 1.3, 10)], to: [v3(-11.5, 1.0, 16.8), v3(-14, 1.5, 10)],
+        enter: () => { app.sound.growl(); app.cam.shake(0.08); },
+        subs: [[0.6, '只剩最後一段路。']]
+      }
+    ], () => {
+      g.showOutside = false;
+      g.chapter('最終章', '樓　外');
+    });
+  }
 }
+
+/** The chapters the title screen can start from, in order. `step` is where play begins. */
+export const CHAPTERS = [
+  { id: 'prologue', step: 'lift', small: '序章', title: '電梯', desc: '停電的電梯停在 8 樓。門外有東西在走動。' },
+  { id: 'home', step: 'sword', small: '第一章', title: '我家', desc: '家裡被闖進來了。爺爺的刀還在衣櫃裡。' },
+  { id: 'stairs', step: 'stairs', small: '第二章', title: '樓梯間', desc: '沒有電梯。八層樓，一層一層殺下去。' },
+  { id: 'outside', step: 'exit', small: '最終章', title: '樓外', desc: '廣場另一頭，救援車的燈還亮著。' },
+  { id: 'boss', step: 'boss', small: '決戰', title: '黑潮之母', desc: '所有影的源頭。殺了它，天就會亮。' }
+];

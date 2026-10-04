@@ -37,6 +37,8 @@ export class UI {
     click('btnContinue', () => { this.landscape(); game().continueFromSave(); });
     this.el.skip.querySelector('.skip-hint__btn').addEventListener('click', (e) => { e.stopPropagation(); game().cine.skip(); });
     click('btnHelp', () => this.el.help.classList.remove('hidden'));
+    click('btnChapters', () => $('chapters').classList.remove('hidden'));
+    click('btnChaptersBack', () => $('chapters').classList.add('hidden'));
     click('btnPauseHelp', () => this.el.help.classList.remove('hidden'));
     this.el.help.querySelector('[data-close]').addEventListener('click', () => this.el.help.classList.add('hidden'));
     click('btnResume', () => game().pause(false));
@@ -97,6 +99,33 @@ export class UI {
     else document.body.classList.remove('cinematic');
   }
   continueButton(show) { $('btnContinue').classList.toggle('hidden', !show); }
+
+  /** Cards for every chapter; the ones not reached yet are locked. */
+  chapterSelect(chapters, unlocked) {
+    const list = $('chapterList');
+    list.innerHTML = '';
+    let open = 0;
+    chapters.forEach((c, i) => {
+      const ok = unlocked.has(c.id);
+      if (ok) open++;
+      const b = document.createElement('button');
+      b.className = `chapter${ok ? '' : ' is-locked'}`;
+      b.disabled = !ok;
+      b.innerHTML = `<span class="chapter__no">${String(i + 1).padStart(2, '0')}</span>` +
+        `<span class="chapter__small">${c.small}</span><b class="chapter__title">${c.title}</b>` +
+        `<span class="chapter__desc">${ok ? c.desc : '尚未到達'}</span>`;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!ok) return;
+        this.app.sound.init();
+        $('chapters').classList.add('hidden');
+        this.landscape();
+        this.app.game.startChapter(c.id);
+      });
+      list.appendChild(b);
+    });
+    $('btnChapters').classList.toggle('hidden', open < 2);
+  }
   hud(on) {
     this.el.hud.classList.toggle('hidden', !on);
     this.app.actionHUD.element.style.display = on ? '' : 'none';

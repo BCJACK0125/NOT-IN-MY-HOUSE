@@ -43,8 +43,11 @@
         <div class="title__buttons">
           <button id="btnStart" class="btn btn--primary">開始遊戲</button>
           <button id="btnContinue" class="btn hidden">從檢查點繼續</button>
-          <button id="btnSkipIntro" class="btn">直接開始（跳過前導片）</button>
-          <button id="btnHelp" class="btn btn--ghost">操作說明</button>
+          <button id="btnChapters" class="btn hidden">選擇章節</button>
+        </div>
+        <div class="title__row">
+          <button id="btnSkipIntro" class="btn btn--small">跳過前導片開始</button>
+          <button id="btnHelp" class="btn btn--small btn--ghost">操作說明</button>
         </div>
         <div class="title__opts">
           <label><input type="checkbox" id="optSound" checked /> 音效與音樂</label>
@@ -59,6 +62,16 @@
         </div>
       </div>
       <p class="title__foot">場景重建自真實的家 · 以 three.js 製作 · 建議使用桌機 Chrome / Edge</p>
+    </div>
+
+    <!-- chapter select -->
+    <div id="chapters" class="screen screen--dim screen--solid hidden">
+      <div class="chapters">
+        <h2 class="chapters__head">選擇章節</h2>
+        <div class="chapters__list" id="chapterList"></div>
+        <p class="chapters__note">玩到哪一章，就解鎖到哪一章。從章節開始會播放該章的開場。</p>
+        <button class="btn btn--ghost" id="btnChaptersBack">返回</button>
+      </div>
     </div>
 
     <!-- controls -->

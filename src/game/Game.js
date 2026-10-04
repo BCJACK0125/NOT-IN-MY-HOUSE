@@ -5,7 +5,7 @@ import { PLAZA, VAN } from '../world/Level.js';
 import { ShockRing } from '../vfx/ShockRing.js';
 import { Cinematic, v3 } from './Cinematic.js';
 import { UI } from './UI.js';
-import { buildSteps } from './Story.js';
+import { buildSteps, CHAPTERS } from './Story.js';
 
 const _v = new Vector3();
 const _w = new Vector3();
@@ -18,6 +18,7 @@ const SWINGS = {
 };
 
 const SAVE_KEY = 'nimh.save.v1';
+const CHAPTER_KEY = 'nimh.chapters.v1';
 
 /**
  * The rules and the story: health and 氣, who hit whom, checkpoints, the
@@ -55,6 +56,7 @@ export class Game {
     this.dawn = 0;
     this._dawnFrom = null;
     this.indoor = 0;
+    this.hidePlayer = false;
 
     const enemies = app.enemies;
     enemies.onNotice = (e) => {
@@ -114,9 +116,10 @@ export class Game {
     this.app.sound.calm = true;
     const save = this._loadSave();
     this.ui.continueButton(!!save);
+    this.ui.chapterSelect(CHAPTERS, this.unlockedChapters());
   }
 
-  newGame({ intro = true, fromSave = null } = {}) {
+  newGame({ intro = true, fromSave = null, chapter = null } = {}) {
     const app = this.app;
     app.sound.init();
     app.cam.clearShot();
@@ -134,13 +137,27 @@ export class Game {
     this.pickups.length = 0;
     this.spawnCrowd();
     this._setSword(false);
+    this.hidePlayer = false;
+    if (chapter && chapter.step !== 'lift') {
+      // Straight into a chapter from the title: the world as the story would
+      // have left it, then that chapter's own opening.
+      const start = this.steps.findIndex((s) => s.id === chapter.step);
+      this._applyStepFlags(start);
+      this._setSword(start > this.steps.findIndex((s) => s.id === 'sword'));
+      this.spirit = 40;
+      if (chapter.id === 'boss') { app.enemies.clear((e) => e.tag === 'crowd'); this.flags.bossSeen = false; }
+      this.goto(start, { checkpoint: true, place: true });
+      if (this.mode !== 'cinematic') this._begin();
+      return;
+    }
     const start = fromSave ? this.steps.findIndex((s) => s.id === fromSave.step) : 0;
     if (fromSave && start > 0) {
       this._setSword(!!fromSave.sword);
       this.spirit = fromSave.spirit ?? 0;
       this.stats = { ...this.stats, ...(fromSave.stats ?? {}) };
       this._applyStepFlags(start);
-      this.goto(start, { checkpoint: true, quiet: false, place: true });
+      if (start > this.steps.findIndex((s) => s.id === 'plaza')) app.enemies.clear((e) => e.tag === 'crowd');
+      this.goto(start, { checkpoint: true, place: true, retry: true });
       this._begin();
       return;
     }
@@ -177,7 +194,7 @@ export class Game {
   /* story                                                               */
   /* ------------------------------------------------------------------ */
 
-  goto(index, { checkpoint = false, quiet = false, place = false } = {}) {
+  goto(index, { checkpoint = false, quiet = false, place = false, retry = false } = {}) {
     this.step?.exit?.(this);
     this.stepIndex = index;
     this.step = this.steps[index];
@@ -187,7 +204,9 @@ export class Game {
       if (this.step.spawn) this._placePlayer(this.step.spawn);
     }
     if (checkpoint || this.step.checkpoint) this._saveCheckpoint();
-    this.step.enter?.(this, { quiet });
+    const chapter = CHAPTERS.find((c) => c.step === this.step.id);
+    if (chapter) this.unlockChapter(chapter.id);
+    this.step.enter?.(this, { quiet, retry });
     this.ui.objective(this.step.chapter ?? '', this._objectiveText());
   }
 
@@ -213,6 +232,30 @@ export class Game {
     } catch {
       /* storage unavailable */
     }
+  }
+
+  /** Chapters reached so far, for the title screen's chapter select. */
+  unlockedChapters() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(CHAPTER_KEY) || '["prologue"]'));
+    } catch {
+      return new Set(['prologue']);
+    }
+  }
+
+  unlockChapter(id) {
+    const set = this.unlockedChapters();
+    if (set.has(id)) return;
+    set.add(id);
+    try { localStorage.setItem(CHAPTER_KEY, JSON.stringify([...set])); } catch { /* storage unavailable */ }
+  }
+
+  /** From the chapter select. */
+  startChapter(id) {
+    const chapter = CHAPTERS.find((c) => c.id === id);
+    if (!chapter) return;
+    if (chapter.step === 'lift') this.newGame({ intro: true });
+    else this.newGame({ chapter });
   }
 
   _loadSave() {
@@ -265,7 +308,7 @@ export class Game {
     this.boss = null;
     this.ui.boss(null);
     this.ui.gameover(false);
-    this.goto(cp.index, { quiet: false, place: true });
+    this.goto(cp.index, { quiet: false, place: true, retry: true });
     this._begin();
   }
 
@@ -711,13 +754,20 @@ export class Game {
 
   quitToTitle() {
     const app = this.app;
+    // Leave 'play'/'cinematic' first, so ending a cutscene below does not hand
+    // control (and the mouse lock) back to a game that is closing.
+    this.mode = 'title';
+    if (this.cine.active) this.cine.skip();
+    this.hidePlayer = false;
+    this.showOutside = false;
+    this.cullY = null;
+    app.cam.unlock();
     app.paused = false;
     this.ui.pause(false);
     this.ui.gameover(false);
     this.ui.ending(false);
     app.reviveBody();
     app.timeScale = 1;
-    this.cine.active && this.cine.skip();
     this.ui.hud(false);
     this.ui.boss(null);
     this.newGameReset();

@@ -19,7 +19,7 @@ const ease = {
  *
  * shot = {
  *   dur, from: [pos, look], to: [pos, look] (or follow: () => [pos, look]),
- *   fov, ease, sub: '...', subAt, enter(), tick(k, dt), exit()
+ *   fov, ease, sub: '...', subAt, subs: [[seconds, text], …], enter(), tick(k, dt), exit()
  * }
  */
 export class Cinematic {
@@ -59,6 +59,7 @@ export class Cinematic {
     const shot = this.shots[this.index];
     if (!shot) return this._finish();
     shot.enter?.();
+    if (shot.subs) for (const s of shot.subs) s.done = false;
     if (shot.sub !== undefined && !shot.subAt) this.ui.subtitle(shot.sub);
     shot._subbed = !shot.subAt;
   }
@@ -102,6 +103,11 @@ export class Cinematic {
     if (!shot._subbed && shot.subAt !== undefined && this.t >= shot.subAt) {
       shot._subbed = true;
       this.ui.subtitle(shot.sub);
+    }
+    if (shot.subs) {
+      for (const s of shot.subs) {
+        if (!s.done && this.t >= s[0]) { s.done = true; this.ui.subtitle(s[1]); }
+      }
     }
     shot.tick?.(k, dt);
     if (shot.follow) {
