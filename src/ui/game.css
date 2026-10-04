@@ -274,3 +274,6 @@ body.touch-ui .skip-hint__btn { display: inline-block; background: rgba(0, 0, 0,
   .chapter__desc { font-size: 11px; }
   .chapters__note { margin: 8px 0; }
 }
+
+/* ---- trailer ----------------------------------------------------------- */
+.trailer__video { width: min(1100px, 92vw); max-height: 80vh; aspect-ratio: 16 / 9; background: #000; border: 1px solid rgba(255, 120, 60, 0.3); }

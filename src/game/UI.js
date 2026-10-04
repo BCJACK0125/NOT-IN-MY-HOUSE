@@ -38,6 +38,19 @@ export class UI {
     this.el.skip.querySelector('.skip-hint__btn').addEventListener('click', (e) => { e.stopPropagation(); game().cine.skip(); });
     click('btnHelp', () => this.el.help.classList.remove('hidden'));
     click('btnChapters', () => $('chapters').classList.remove('hidden'));
+    click('btnTrailer', () => {
+      app.sound.setMuted(true);
+      $('trailer').classList.remove('hidden');
+      const v = $('trailerVideo');
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    });
+    click('btnTrailerClose', () => {
+      const v = $('trailerVideo');
+      v.pause();
+      $('trailer').classList.add('hidden');
+      app.sound.setMuted(!$('optSound').checked);
+    });
     click('btnChaptersBack', () => $('chapters').classList.add('hidden'));
     click('btnPauseHelp', () => this.el.help.classList.remove('hidden'));
     this.el.help.querySelector('[data-close]').addEventListener('click', () => this.el.help.classList.add('hidden'));

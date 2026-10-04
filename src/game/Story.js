@@ -200,7 +200,7 @@ export function buildSteps(g) {
         const rush = (kind, delay) => g.later(delay, () => g.spawn(kind, { ...xz(P(7.4, 12.4)), y: y8, awake: true }, 'climb'));
         g.cinematic([
           {
-            dur: 4.2, from: [v3(1.6, y8 + 2.4, 11.4), v3(-4, y8 + 0.4, 12)], to: [v3(-1.2, y8 + 3.0, 12.4), v3(-18, 0, 18)],
+            dur: 4.2, from: [v3(-0.5, y8 + 2.6, 11.6), v3(-10, 2, 13)], to: [v3(-1.2, y8 + 3.0, 12.4), v3(-18, 0, 18)],
             sub: '樓下的廣場……救援車還在，在另一頭。',
             enter: () => { g.showOutside = true; g.cullY = 0; app.sound.siren(); }
           },

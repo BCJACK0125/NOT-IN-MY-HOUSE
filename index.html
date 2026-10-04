@@ -48,6 +48,7 @@
         <div class="title__row">
           <button id="btnSkipIntro" class="btn btn--small">跳過前導片開始</button>
           <button id="btnHelp" class="btn btn--small btn--ghost">操作說明</button>
+          <button id="btnTrailer" class="btn btn--small btn--ghost">▶ 預告片</button>
         </div>
         <div class="title__opts">
           <label><input type="checkbox" id="optSound" checked /> 音效與音樂</label>
@@ -72,6 +73,12 @@
         <p class="chapters__note">玩到哪一章，就解鎖到哪一章。從章節開始會播放該章的開場。</p>
         <button class="btn btn--ghost" id="btnChaptersBack">返回</button>
       </div>
+    </div>
+
+    <!-- trailer -->
+    <div id="trailer" class="screen screen--dim screen--solid hidden">
+      <video id="trailerVideo" class="trailer__video" controls playsinline preload="none" poster="media/trailer-poster.jpg" src="media/trailer.mp4"></video>
+      <button class="btn btn--ghost" id="btnTrailerClose">關閉</button>
     </div>
 
     <!-- controls -->

@@ -6,7 +6,7 @@
 
 瀏覽器裡的第三人稱 3D 動作遊戲。場景重建自真實的家（[Mi Casa es Su Casa](https://github.com/BCJACK0125/Mi-Casa-es-Su-Casa)），角色、戰鬥與特效建立在 [Samurai Third-Person Template](https://github.com/achrefelouafi/SamuraiThirdPersonTemplateThreeJS) 上。
 
-▶ 前導片：[`media/trailer.webm`](media/trailer.webm)（遊戲開始時也會即時播放，可按住 Enter / Esc 跳過）
+▶ 預告片（3 分鐘，有聲）：[`media/trailer.mp4`](media/trailer.mp4)，標題畫面的「▶ 預告片」也能直接看。遊戲中的前導片與章節過場都是即時演算，可按住 Enter / Esc 跳過。
 
 ## 怎麼玩
 
@@ -99,6 +99,18 @@ src/game/Story.js     劇本：每個章節、出怪、過場運鏡、前導片�
 src/game/Cinematic.js 即時過場系統（鏡頭運動 + 字幕）
 src/game/Sound.js     WebAudio 合成的音效與動態配樂（沒有音檔）
 src/config/enemyTypes.js  四種敵人的數值
+tools/trailer.js      預告片導演：跳章節、挑過場鏡頭、自動戰鬥，並在頁面內把畫面＋字幕＋音效合成錄影
+tools/record-trailer.cjs  用 Playwright 開 Chrome 執行上面的導演並存檔
+```
+
+### 重新錄製預告片
+
+預告片是用遊戲本身錄的（不是另外剪的素材）：導演腳本控制劇情與自動戰鬥，頁面把 WebGL 畫面、字幕／黑邊／標題卡和 WebAudio 混音一起送進 MediaRecorder，所以聲音和畫面同步。
+
+```bash
+python -m http.server 8137
+node tools/record-trailer.cjs trailer-raw.webm      # 需要 Playwright 與本機 Chrome，約 3 分半
+ffmpeg -ss 1.2 -i trailer-raw.webm -c:v libx264 -crf 27 -pix_fmt yuv420p -r 30   -c:a aac -b:a 160k -ar 48000 -af loudnorm=I=-16:TP=-1.5 -movflags +faststart media/trailer.mp4
 ```
 
 ## 素材與授權
