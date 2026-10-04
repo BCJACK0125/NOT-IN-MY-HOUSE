@@ -8,7 +8,7 @@ import { Score, makeImpulse } from './Score.js';
  *   sfx       short enveloped noise bursts and oscillators, with a little
  *             random pitch/level per play and a cap on how many of the same
  *             sound may start at once, so repeats never sound mechanical
- *   ambience  the black rain (clear outside, muffled indoors), wind, thunder
+ *   ambience  wind and distant thunder (louder outdoors), on its own slider
  * plus one generated hall reverb both the score and the effects send into —
  * wetter outdoors than in a flat.
  *
@@ -26,6 +26,7 @@ export class Sound {
     this.indoor = 1;
     this._recent = new Map();
     this._thunder = 18;
+    this.ambience = 1;
   }
 
   init() {
@@ -79,11 +80,15 @@ export class Sound {
     this._ambience();
   }
 
-  /** Wind, distant city, and the black rain. */
+  /**
+   * Wind and the occasional thunder. (There was a rain bed here too — a looped
+   * white-noise hiss — but under everything else it only ever read as a
+   * constant background noise, so it is gone.)
+   */
   _ambience() {
     const ctx = this.ctx;
     this.amb = ctx.createGain();
-    this.amb.gain.value = 1;
+    this.amb.gain.value = this.ambience;
     this.amb.connect(this.master);
     const wind = ctx.createBufferSource();
     wind.buffer = this._brown;
@@ -92,23 +97,9 @@ export class Sound {
     wlp.type = 'lowpass';
     wlp.frequency.value = 420;
     this.windGain = ctx.createGain();
-    this.windGain.gain.value = 0.045;
+    this.windGain.gain.value = 0.03;
     wind.connect(wlp).connect(this.windGain).connect(this.amb);
     wind.start();
-    // rain: bright hiss outside, a dull wash through the walls
-    const rain = ctx.createBufferSource();
-    rain.buffer = this._white;
-    rain.loop = true;
-    const hp = ctx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = 900;
-    this.rainLp = ctx.createBiquadFilter();
-    this.rainLp.type = 'lowpass';
-    this.rainLp.frequency.value = 1400;
-    this.rainGain = ctx.createGain();
-    this.rainGain.gain.value = 0.02;
-    rain.connect(hp).connect(this.rainLp).connect(this.rainGain).connect(this.amb);
-    rain.start();
   }
 
   /** 0 = out in the plaza, 1 = inside the flat or the stairwell. */
@@ -116,15 +107,19 @@ export class Sound {
     if (!this.ctx) return;
     this.indoor = indoor;
     const now = this.ctx.currentTime;
-    this.rainLp.frequency.setTargetAtTime(1300 + (1 - indoor) * 6000, now, 0.4);
-    this.rainGain.gain.setTargetAtTime(0.018 + (1 - indoor) * 0.05, now, 0.4);
-    this.windGain.gain.setTargetAtTime(0.03 + (1 - indoor) * 0.03, now, 0.4);
+    this.windGain.gain.setTargetAtTime(0.022 + (1 - indoor) * 0.02, now, 0.4);
     this.sfxSend.gain.setTargetAtTime(0.08 + (1 - indoor) * 0.16, now, 0.4);
   }
 
   setMuted(m) {
     this.muted = m;
     if (this.master) this.master.gain.value = m ? 0 : this.volume;
+  }
+
+  /** Player option: wind and thunder, 0 (off) to 1. */
+  setAmbience(v) {
+    this.ambience = v;
+    if (this.amb) this.amb.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
   }
 
   setVolume(v) {

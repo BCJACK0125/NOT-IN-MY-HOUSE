@@ -253,6 +253,9 @@ body.touch-ui .skip-hint__btn { display: inline-block; background: rgba(0, 0, 0,
   .meta { top: 8px; right: 14px; }
   .meta__floor { font-size: 24px; }
   .subtitle { bottom: 30vh; font-size: 15px; }
+  .card--menu { gap: 6px; }
+  .card--menu h2 { margin: 0 0 2px; font-size: 20px; }
+  .slider { font-size: 13px; }
   .prompt { top: 55%; font-size: 14px; }
   .combo b { font-size: 40px; }
   .card { padding: 16px 20px; max-height: 92vh; overflow: auto; }

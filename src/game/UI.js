@@ -72,6 +72,14 @@ export class UI {
       const saved = localStorage.getItem('nimh.shake');
       if (saved !== null) { setShake(+saved); $('optShake').value = saved; }
     } catch {}
+    try {
+      const amb = localStorage.getItem('nimh.ambience');
+      if (amb !== null) { app.sound.setAmbience(+amb); $('optAmb').value = amb; }
+    } catch {}
+    $('optAmb').addEventListener('input', (e) => {
+      app.sound.setAmbience(+e.target.value);
+      try { localStorage.setItem('nimh.ambience', e.target.value); } catch {}
+    });
     $('optShake').addEventListener('input', (e) => {
       setShake(+e.target.value);
       try { localStorage.setItem('nimh.shake', e.target.value); } catch {}
