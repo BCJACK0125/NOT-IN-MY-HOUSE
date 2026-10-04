@@ -421,7 +421,7 @@ export function buildSteps(g) {
     g.cinematic([
       {
         dur: 5.2, from: [v3(-36, 52, -22), v3(8, 6, 14)],
-        enter: () => { g.ui.fade(true); L.carDisplay.userData.draw('1'); app.sound.calm = true; },
+        enter: () => { g.ui.fade(true); L.carDisplay.userData.draw('1'); },
         tick: (k) => {
           if (k > 0.08 && !this1.a) { this1.a = 1; g.ui.subtitle('2026 年 10 月 4 日，深夜。'); }
           if (k > 0.5 && !this1.b) { this1.b = 1; g.ui.subtitle('城市下了一場<em>黑色的雨</em>。'); }

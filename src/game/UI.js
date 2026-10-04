@@ -70,6 +70,11 @@ export class UI {
       if (game().mode === 'play' && !app.paused && !document.pointerLockElement) app.cam.lock();
     });
     if (app.isTouch) this._touch();
+    // Browsers only start audio after a gesture: the first one on the title
+    // screen starts the title theme.
+    const wake = () => app.sound.init();
+    window.addEventListener('pointerdown', wake, { once: true });
+    window.addEventListener('keydown', wake, { once: true });
     this.setQuality(false);
     this.hud(false);
   }

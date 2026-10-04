@@ -113,7 +113,6 @@ export class Game {
     this.mode = 'title';
     this.ui.title(true);
     this.ui.hud(false);
-    this.app.sound.calm = true;
     const save = this._loadSave();
     this.ui.continueButton(!!save);
     this.ui.chapterSelect(CHAPTERS, this.unlockedChapters());
@@ -170,7 +169,6 @@ export class Game {
   _begin() {
     this.mode = 'play';
     this.ui.hud(true);
-    this.app.sound.calm = false;
     this.app.cam.lock();
     this.app.controller.enabled = true;
     this.app.input.enabled = true;
@@ -365,6 +363,7 @@ export class Game {
 
   chapter(small, big) {
     this.ui.chapterCard(small, big);
+    this.app.sound.stinger('chapter');
   }
 
   say(text, seconds = 3.5) {
@@ -606,6 +605,7 @@ export class Game {
     app.cam.pitch = 1.05;
     app.timeScale = 0.35;
     app.sound.roar();
+    app.sound.stinger('death');
     app.cam.unlock();
   }
 
@@ -647,10 +647,12 @@ export class Game {
   setBoss(enemy) {
     this.boss = enemy;
     this.ui.boss(enemy);
+    this.app.sound.stinger('reveal');
   }
 
   _bossDown() {
     const app = this.app;
+    app.sound.stinger('victory');
     this.ui.boss(null);
     app.timeScale = 0.25;
     this.later(1.6, () => { app.timeScale = 1; });
@@ -856,15 +858,50 @@ export class Game {
         this._beat -= raw;
         if (this._beat <= 0) { this._beat = 0.9; app.sound.heartbeat(); }
       }
-      // music: how many are on you
-      let engaged = 0;
-      for (const e of app.enemies.enemies) if (e.alive && e.ai !== 'dormant' && this._near(e, 16)) engaged++;
-      app.sound.intensity = engaged > 0 || this.boss?.alive ? 1 : 0;
       this.ui.objectiveText(this._objectiveText());
-    } else if (this.mode !== 'cinematic') {
-      app.sound.intensity = 0;
     }
+    this._music(dt);
     this.ui.update(dt, this);
+  }
+
+  /**
+   * Which cue the score should be on, and how hard.
+   *   title · cinematic · explore ⇄ combat (with a few seconds of hold so a
+   *   lull in a fight does not drop the drums) · boss · dawn · death
+   * Combat intensity is how many shades are actually on you (four is
+   * everything), pushed up when you are low on health or deep in a combo.
+   */
+  _music(dt) {
+    const app = this.app;
+    const s = app.sound;
+    let engaged = 0;
+    let near = 0;
+    for (const e of app.enemies.enemies) {
+      if (!e.alive || e.ai === 'dormant' || e.tag === 'crowd' && !this._near(e, 22)) continue;
+      if (this._near(e, 12)) engaged++;
+      else if (this._near(e, 25)) near++;
+    }
+    if (engaged > 0) this._lastFight = 0;
+    else this._lastFight = (this._lastFight ?? 99) + dt;
+    let cue;
+    let intensity = 0;
+    if (this.mode === 'title' || this.mode === 'loading') cue = 'title';
+    else if (this.mode === 'ending' || this.dawn > 0) cue = 'dawn';
+    else if (this.mode === 'dead') cue = 'death';
+    else if (this.boss?.alive) {
+      cue = 'boss';
+      intensity = this.flags.phase2 ? 1 : 0.45;
+    } else if (this.mode === 'cinematic') cue = 'cinematic';
+    else if (engaged > 0 || this._lastFight < 4) {
+      cue = 'combat';
+      intensity = Math.min(1, engaged / 4 + (this.hp < 35 ? 0.3 : 0) + Math.min(0.3, this.combo * 0.03));
+    } else {
+      cue = 'explore';
+      intensity = near > 0 ? 0.6 : 0;
+    }
+    s.cue = cue;
+    s.intensity = intensity;
+    s.setSpace?.(this.indoor);
   }
 
   /** Called with the distance the body moved this frame (footsteps). */

@@ -1,10 +1,19 @@
+import { Score, makeImpulse } from './Score.js';
+
 /**
  * Everything you hear, synthesised with WebAudio — no sound files to download.
  *
- * Effects are short enveloped noise bursts and oscillators. The score is two
- * layers that cross-fade on `intensity` (0 calm → 1 fight): a low drone with a
- * slow minor pad, and a pulse of taiko-like hits and a sub bass that only comes
- * in when blades are out.
+ * The mix is three buses into a glue compressor and a limiter:
+ *   music     the adaptive score (`Score.js`), ducked under the big hits
+ *   sfx       short enveloped noise bursts and oscillators, with a little
+ *             random pitch/level per play and a cap on how many of the same
+ *             sound may start at once, so repeats never sound mechanical
+ *   ambience  the black rain (clear outside, muffled indoors), wind, thunder
+ * plus one generated hall reverb both the score and the effects send into —
+ * wetter outdoors than in a flat.
+ *
+ * The game says which `cue` it wants and how intense things are; the score
+ * does the rest (see `Score.js`).
  */
 export class Sound {
   constructor() {
@@ -13,9 +22,10 @@ export class Sound {
     this.muted = false;
     this.volume = 0.8;
     this.intensity = 0;
-    this._intensity = 0;
-    this._beat = 0;
-    this._step = 0;
+    this.cue = 'title';
+    this.indoor = 1;
+    this._recent = new Map();
+    this._thunder = 18;
   }
 
   init() {
@@ -28,30 +38,88 @@ export class Sound {
     const ctx = (this.ctx = new AC());
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : this.volume;
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -14;
-    comp.ratio.value = 4;
-    this.master.connect(comp).connect(ctx.destination);
+    // glue, then a brick-wall-ish limiter so nothing ever clips
+    const glue = ctx.createDynamicsCompressor();
+    glue.threshold.value = -16;
+    glue.ratio.value = 3;
+    glue.attack.value = 0.01;
+    glue.release.value = 0.25;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -3;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.12;
+    this.master.connect(glue).connect(limiter).connect(ctx.destination);
+
+    // the hall
+    this.reverb = ctx.createConvolver();
+    this.reverb.buffer = makeImpulse(ctx, 2.8, 3);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.8;
+    this.reverb.connect(wet).connect(this.master);
+
+    // music
+    this.music = ctx.createGain();
+    this.music.gain.value = 0.62;
+    this.musicDuck = ctx.createGain();
+    this.music.connect(this.musicDuck).connect(this.master);
+    this.score = new Score(ctx, this.music, this.reverb);
+
+    // effects
     this.sfx = ctx.createGain();
     this.sfx.gain.value = 0.9;
     this.sfx.connect(this.master);
-    this.music = ctx.createGain();
-    this.music.gain.value = 0.55;
-    this.music.connect(this.master);
-    this._white = this._noiseBuffer(1, false);
+    this.sfxSend = ctx.createGain();
+    this.sfxSend.gain.value = 0.12;
+    this.sfx.connect(this.sfxSend).connect(this.reverb);
+
+    this._white = this._noiseBuffer(2, false);
     this._brown = this._noiseBuffer(4, true);
-    // wind / distant city
-    const amb = ctx.createBufferSource();
-    amb.buffer = this._brown;
-    amb.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 420;
-    this.ambGain = ctx.createGain();
-    this.ambGain.gain.value = 0.05;
-    amb.connect(lp).connect(this.ambGain).connect(this.master);
-    amb.start();
-    this._startScore();
+    this._ambience();
+  }
+
+  /** Wind, distant city, and the black rain. */
+  _ambience() {
+    const ctx = this.ctx;
+    this.amb = ctx.createGain();
+    this.amb.gain.value = 1;
+    this.amb.connect(this.master);
+    const wind = ctx.createBufferSource();
+    wind.buffer = this._brown;
+    wind.loop = true;
+    const wlp = ctx.createBiquadFilter();
+    wlp.type = 'lowpass';
+    wlp.frequency.value = 420;
+    this.windGain = ctx.createGain();
+    this.windGain.gain.value = 0.045;
+    wind.connect(wlp).connect(this.windGain).connect(this.amb);
+    wind.start();
+    // rain: bright hiss outside, a dull wash through the walls
+    const rain = ctx.createBufferSource();
+    rain.buffer = this._white;
+    rain.loop = true;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 900;
+    this.rainLp = ctx.createBiquadFilter();
+    this.rainLp.type = 'lowpass';
+    this.rainLp.frequency.value = 1400;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = 0.02;
+    rain.connect(hp).connect(this.rainLp).connect(this.rainGain).connect(this.amb);
+    rain.start();
+  }
+
+  /** 0 = out in the plaza, 1 = inside the flat or the stairwell. */
+  setSpace(indoor) {
+    if (!this.ctx) return;
+    this.indoor = indoor;
+    const now = this.ctx.currentTime;
+    this.rainLp.frequency.setTargetAtTime(1300 + (1 - indoor) * 6000, now, 0.4);
+    this.rainGain.gain.setTargetAtTime(0.018 + (1 - indoor) * 0.05, now, 0.4);
+    this.windGain.gain.setTargetAtTime(0.03 + (1 - indoor) * 0.03, now, 0.4);
+    this.sfxSend.gain.setTargetAtTime(0.08 + (1 - indoor) * 0.16, now, 0.4);
   }
 
   setMuted(m) {
@@ -76,9 +144,24 @@ export class Sound {
     return b;
   }
 
-  tone(freq, dur, { type = 'sine', vol = 0.2, delay = 0, attack = 0.005, slide = 0, out = null } = {}) {
+  /** At most `max` starts of the same sound inside `window` seconds. */
+  _allow(key, max = 4, window = 0.09) {
+    if (!key || !this.ctx) return true;
+    const now = this.ctx.currentTime;
+    const list = (this._recent.get(key) ?? []).filter((t) => now - t < window);
+    if (list.length >= max) return false;
+    list.push(now);
+    this._recent.set(key, list);
+    return true;
+  }
+
+  tone(freq, dur, { type = 'sine', vol = 0.2, delay = 0, attack = 0.005, slide = 0, out = null, vary = 0 } = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx;
+    if (vary) {
+      freq *= 1 + (Math.random() * 2 - 1) * vary;
+      vol *= 1 + (Math.random() * 2 - 1) * vary * 2;
+    }
     const t = ctx.currentTime + delay;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
@@ -93,9 +176,13 @@ export class Sound {
     o.stop(t + dur + 0.05);
   }
 
-  noise(dur, { freq = 800, q = 1, vol = 0.2, type = 'bandpass', delay = 0, sweep = 0, attack = 0.002, out = null } = {}) {
+  noise(dur, { freq = 800, q = 1, vol = 0.2, type = 'bandpass', delay = 0, sweep = 0, attack = 0.002, out = null, vary = 0 } = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx;
+    if (vary) {
+      freq *= 1 + (Math.random() * 2 - 1) * vary;
+      vol *= 1 + (Math.random() * 2 - 1) * vary * 2;
+    }
     const t = ctx.currentTime + delay;
     const src = ctx.createBufferSource();
     src.buffer = this._white;
@@ -116,23 +203,30 @@ export class Sound {
 
   /* ---- effects ---------------------------------------------------- */
   swing(heavy = false) {
-    this.noise(heavy ? 0.32 : 0.22, { freq: heavy ? 900 : 1500, sweep: 0.35, q: 1.4, vol: heavy ? 0.22 : 0.16, attack: 0.04 });
+    if (!this._allow('swing', 2)) return;
+    this.noise(heavy ? 0.32 : 0.22, { freq: heavy ? 900 : 1500, sweep: 0.35, q: 1.4, vol: heavy ? 0.22 : 0.16, attack: 0.04, vary: 0.08 });
   }
   slash() {
-    this.noise(0.18, { freq: 3500, sweep: 0.5, q: 3, vol: 0.25 });
-    this.tone(1900, 0.12, { type: 'triangle', vol: 0.05, slide: 0.6 });
+    if (!this._allow('slash', 2)) return;
+    this.noise(0.18, { freq: 3500, sweep: 0.5, q: 3, vol: 0.25, vary: 0.07 });
+    this.tone(1900, 0.12, { type: 'triangle', vol: 0.05, slide: 0.6, vary: 0.05 });
   }
   hit(heavy = false) {
-    this.noise(0.12, { freq: 260, q: 0.9, vol: heavy ? 0.6 : 0.42, type: 'lowpass' });
-    this.tone(heavy ? 70 : 95, heavy ? 0.28 : 0.16, { type: 'sine', vol: heavy ? 0.5 : 0.35, slide: 0.5 });
-    this.noise(0.06, { freq: 2500, q: 1, vol: 0.12 });
+    if (!this._allow('hit', 3)) return;
+    this.noise(0.12, { freq: 260, q: 0.9, vol: heavy ? 0.6 : 0.42, type: 'lowpass', vary: 0.08 });
+    this.tone(heavy ? 70 : 95, heavy ? 0.28 : 0.16, { type: 'sine', vol: heavy ? 0.5 : 0.35, slide: 0.5, vary: 0.06 });
+    this.noise(0.06, { freq: 2500, q: 1, vol: 0.12, vary: 0.1 });
+    if (heavy) this.duckMusic(0.7, 0.35);
   }
   cut() {
-    this.noise(0.35, { freq: 1200, sweep: 0.3, q: 0.8, vol: 0.35 });
-    this.noise(0.5, { freq: 300, q: 0.5, vol: 0.18, type: 'lowpass', delay: 0.04 });
+    if (!this._allow('cut', 2)) return;
+    this.noise(0.35, { freq: 1200, sweep: 0.3, q: 0.8, vol: 0.35, vary: 0.08 });
+    this.noise(0.5, { freq: 300, q: 0.5, vol: 0.18, type: 'lowpass', delay: 0.04, vary: 0.08 });
+    this.duckMusic(0.72, 0.4);
   }
   hurt() {
-    this.tone(160, 0.25, { type: 'sawtooth', vol: 0.12, slide: 0.6 });
+    this.tone(160, 0.25, { type: 'sawtooth', vol: 0.12, slide: 0.6, vary: 0.08 });
+    this.duckMusic(0.7, 0.3);
     this.noise(0.2, { freq: 400, q: 1, vol: 0.4, type: 'lowpass' });
   }
   dodge() {
@@ -144,6 +238,7 @@ export class Sound {
     this.noise(0.6, { freq: 5000, sweep: 0.2, q: 2, vol: 0.08 });
   }
   growl(big = false) {
+    if (!this._allow('growl', 2, 0.6)) return;
     this.tone(big ? 55 : 85 + Math.random() * 30, big ? 1.2 : 0.6, { type: 'sawtooth', vol: big ? 0.18 : 0.08, slide: 0.7, attack: 0.08 });
     this.noise(big ? 1.1 : 0.5, { freq: big ? 220 : 380, q: 4, vol: big ? 0.25 : 0.1, attack: 0.1, sweep: 0.6 });
   }
@@ -151,11 +246,12 @@ export class Sound {
     this.noise(0.4, { freq: 300, sweep: 4, q: 6, vol: 0.06, attack: 0.3 });
   }
   slam() {
+    this.duckMusic(0.55, 0.6);
     this.tone(45, 0.9, { type: 'sine', vol: 0.7, slide: 0.5 });
     this.noise(0.8, { freq: 180, q: 0.7, vol: 0.6, type: 'lowpass' });
   }
   step(surface = 'tile') {
-    this.noise(0.06, { freq: surface === 'wood' ? 300 : surface === 'street' ? 700 : 1400, q: 0.8, vol: 0.03 + Math.random() * 0.015 });
+    this.noise(0.06, { freq: surface === 'wood' ? 300 : surface === 'street' ? 700 : 1400, q: 0.8, vol: 0.035, vary: 0.12 });
   }
   pickup() {
     [784, 988, 1318].forEach((f, i) => this.tone(f, 0.35, { type: 'triangle', vol: 0.09, delay: i * 0.06 }));
@@ -244,65 +340,47 @@ export class Sound {
   }
 
   /* ---- score ------------------------------------------------------ */
-  _startScore() {
-    const ctx = this.ctx;
-    // Drone: two detuned saws through a slow-moving filter.
-    this.drone = ctx.createGain();
-    this.drone.gain.value = 0.0;
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = 300;
-    f.Q.value = 4;
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 0.07;
-    lfoGain.gain.value = 160;
-    lfo.connect(lfoGain).connect(f.frequency);
-    lfo.start();
-    for (const freq of [55, 55.4, 82.4]) {
-      const o = ctx.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.value = freq > 80 ? 0.05 : 0.09;
-      o.connect(g).connect(f);
-      o.start();
-    }
-    f.connect(this.drone).connect(this.music);
-    this.fight = ctx.createGain();
-    this.fight.gain.value = 0;
-    this.fight.connect(this.music);
-    this._next = ctx.currentTime + 0.1;
-  }
 
-  /** Called every frame. Schedules the fight layer a beat ahead. */
-  update(dt) {
-    if (!this.ctx || !this.drone) return;
-    // A director (the trailer) can hold the score where it wants it.
-    const goal = this.override ?? this.intensity;
-    const calm = this.calmOverride ?? this.calm;
-    this._intensity += (goal - this._intensity) * Math.min(1, dt * (this.override !== undefined && this.override !== null ? 2.5 : 0.8));
+  /** Pull the music down under a big moment, then let it back up. */
+  duckMusic(level = 0.7, hold = 0.35) {
+    if (!this.musicDuck) return;
     const now = this.ctx.currentTime;
-    this.drone.gain.setTargetAtTime(calm ? 0.08 : 0.32 - this._intensity * 0.1, now, 0.5);
-    this.fight.gain.setTargetAtTime(this._intensity * 0.9, now, 0.3);
-    const bpm = 132;
-    const beat = 60 / bpm / 2;
-    while (this._next < now + 0.2) {
-      const t = this._next;
-      const s = this._step++ % 16;
-      const delay = t - now;
-      if (this._intensity > 0.05) {
-        if (s === 0 || s === 6 || s === 10) this._drum(delay, 1);
-        if (s === 4 || s === 12) this._drum(delay, 0.6, true);
-        if (s % 2 === 0) this.tone([55, 55, 65.4, 49][(this._step >> 4) % 4], beat * 1.6, { type: 'square', vol: 0.06, delay, out: this.fight });
-        if (s === 14) this.noise(0.08, { freq: 6000, q: 1, vol: 0.05, delay, out: this.fight });
-      }
-      this._next += beat;
-    }
+    const g = this.musicDuck.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(level, now + 0.04);
+    g.setTargetAtTime(1, now + hold, 0.25);
   }
 
-  _drum(delay, vol, high = false) {
-    this.tone(high ? 140 : 62, 0.35, { type: 'sine', vol: 0.5 * vol, slide: 0.45, delay, out: this.fight });
-    this.noise(0.12, { freq: high ? 1200 : 200, q: 0.8, vol: 0.25 * vol, type: high ? 'bandpass' : 'lowpass', delay, out: this.fight });
+  /** A short musical punctuation: 'chapter' · 'reveal' · 'victory' · 'death'. */
+  stinger(kind) {
+    if (!this.score) return;
+    this.duckMusic(0.5, 0.8);
+    this.score.stinger(kind);
+  }
+
+  /** Called every frame. */
+  update(dt) {
+    if (!this.ctx || !this.score) return;
+    let cue = this.cue;
+    let intensity = this.intensity;
+    // a director (the trailer) can hold the score where it wants it
+    if (this.override !== undefined && this.override !== null) {
+      intensity = this.override;
+      cue = this.calmOverride ? 'cinematic' : this.override > 0.3 ? 'combat' : 'explore';
+    }
+    this.score.intensity = intensity;
+    this.score.set(cue);
+    this.score.update(dt);
+    // distant thunder now and then, outdoors louder
+    this._thunder -= dt;
+    if (this._thunder <= 0) {
+      this._thunder = 22 + Math.random() * 35;
+      if (cue !== 'title' && cue !== 'dawn') {
+        const v = 0.12 + (1 - this.indoor) * 0.18;
+        this.noise(3.5, { freq: 160, q: 0.5, vol: v, type: 'lowpass', attack: 0.4, out: this.amb });
+        this.tone(36, 3, { vol: v * 0.8, attack: 0.5, out: this.amb });
+      }
+    }
   }
 }
