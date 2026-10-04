@@ -1,6 +1,11 @@
 import { PerspectiveCamera, Vector3, MathUtils } from 'three';
 import { LAYER } from './Layers.js';
 
+/** Metres of offset at full trauma. */
+const MAX_SHAKE = 0.9;
+/** The kick spring's angular frequency: ~0.05 s to peak, settled by ~0.25 s. */
+const KICK_W = 22;
+
 const _dir = new Vector3();
 const _want = new Vector3();
 const _look = new Vector3();
@@ -36,8 +41,16 @@ export class PlayerCamera {
     this.sensitivity = 1;
     this.enabled = true;
     this.shot = null;
-    this._shake = 0;
+    /** Trauma, 0..1: hits add to it, it bleeds off linearly, the lens moves by its square. */
+    this._trauma = 0;
     this._seed = Math.random() * 100;
+    /** A critically damped spring the lens is punched along: offset and velocity. */
+    this._kick = new Vector3();
+    this._kickV = new Vector3();
+    this._roll = 0;
+    this._rollV = 0;
+    /** Player option: 0 turns every shake and kick off. */
+    this.shakeScale = 1;
     this.fovKick = 0;
     this.baseFov = 62;
     this.locked = false;
@@ -89,8 +102,25 @@ export class PlayerCamera {
     this.pitch = pitch;
   }
 
+  /**
+   * Shake by `amount` metres of peak offset. Stacking hits add trauma rather
+   * than overwrite it, and the square keeps small knocks small.
+   */
   shake(amount) {
-    this._shake = Math.max(this._shake, amount);
+    const t = Math.sqrt(Math.min(1, Math.max(0, amount) / MAX_SHAKE));
+    this._trauma = Math.min(1, Math.max(this._trauma, t) + t * 0.12);
+  }
+
+  /**
+   * Punch the lens along a world direction (the way the blow travelled) and
+   * roll it a little. `amount` is metres of peak travel.
+   */
+  kick(x, y, z, amount, roll = 0) {
+    const v = amount * this.shakeScale * KICK_W * Math.E;
+    this._kickV.x += x * v;
+    this._kickV.y += y * v;
+    this._kickV.z += z * v;
+    this._rollV += roll * this.shakeScale * KICK_W * Math.E;
   }
 
   setShot(pos, look, fov = null) {
@@ -108,7 +138,17 @@ export class PlayerCamera {
 
   update(dt, anchor) {
     const cam = this.camera;
-    this._shake = Math.max(0, this._shake - this._shake * Math.min(1, dt * 9) - dt * 0.02);
+    this._trauma = Math.max(0, this._trauma - dt * 2.4);
+    // The kick: x'' = -w²x - 2wx', integrated in small steps so a long frame
+    // cannot blow it up.
+    for (let left = dt; left > 1e-5; left -= 1 / 120) {
+      const h = Math.min(left, 1 / 120);
+      this._kickV.addScaledVector(this._kick, -KICK_W * KICK_W * h).multiplyScalar(1 - 2 * KICK_W * h);
+      this._kick.addScaledVector(this._kickV, h);
+      this._rollV += (-KICK_W * KICK_W * this._roll) * h;
+      this._rollV *= 1 - 2 * KICK_W * h;
+      this._roll += this._rollV * h;
+    }
     const fov = (this.shot?.fov ?? this.baseFov) + this.fovKick;
     this.fovKick *= Math.exp(-dt * 6);
     if (Math.abs(cam.fov - fov) > 0.01) {
@@ -148,12 +188,18 @@ export class PlayerCamera {
       cam.lookAt(_look);
     }
 
-    if (this._shake > 1e-4) {
+    const shake = this._trauma * this._trauma * MAX_SHAKE * this.shakeScale;
+    if (shake > 1e-4) {
+      // Smooth noise (summed sines), never a fresh random offset per frame:
+      // that reads as buzzing, not as a blow.
       const s = (performance.now() * 0.001 + this._seed) * 42;
-      cam.position.x += (Math.sin(s) + Math.sin(s * 1.7)) * 0.5 * this._shake;
-      cam.position.y += (Math.sin(s * 1.3 + 2.1) + Math.sin(s * 2.3)) * 0.5 * this._shake;
-      cam.position.z += (Math.sin(s * 0.9 + 4.2) + Math.sin(s * 1.9)) * 0.5 * this._shake;
+      cam.position.x += (Math.sin(s) + Math.sin(s * 1.7)) * 0.5 * shake;
+      cam.position.y += (Math.sin(s * 1.3 + 2.1) + Math.sin(s * 2.3)) * 0.5 * shake;
+      cam.position.z += (Math.sin(s * 0.9 + 4.2) + Math.sin(s * 1.9)) * 0.5 * shake;
     }
+    if (!this.shot) cam.position.add(this._kick);
+    const roll = this._roll + (shake > 1e-4 ? Math.sin((performance.now() * 0.001 + this._seed) * 31) * this._trauma * this._trauma * 0.035 * this.shakeScale : 0);
+    if (Math.abs(roll) > 1e-5) cam.rotateZ(roll);
   }
 
   /** How close the lens is to the body — the game hides the body when it is inside it. */

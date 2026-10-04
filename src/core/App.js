@@ -34,6 +34,7 @@ import { BladeStorm } from '../vfx/BladeStorm.js';
 import { TargetRings } from '../vfx/TargetRings.js';
 import { TargetMarkers } from '../vfx/TargetMarkers.js';
 import { Fire } from '../vfx/Fire.js';
+import { CombatFX } from '../vfx/CombatFX.js';
 import { EquipmentLibrary } from '../equipment/EquipmentLibrary.js';
 import { EquipmentManager } from '../equipment/EquipmentManager.js';
 import { LoadingScreen } from '../ui/LoadingScreen.js';
@@ -200,6 +201,7 @@ export class App {
 
     /* ---- post + UI ---- */
     this.post = new PostProcessing(this.renderer, this.scene, this.camera);
+    this.fx = new CombatFX(this);
     this.loading = new LoadingScreen();
     this.toast = new Toast();
     this.actionHUD = new ActionHUD();
@@ -257,6 +259,7 @@ export class App {
     await this.equipment.equip('scabbard');
     this.weaponFire = new WeaponFire({ equipment: this.equipment });
     this.weaponFire.attachTo(this.scene);
+    this.fx.prewarm();
 
     this.loading.setProgress(0.88, '種樹…');
     try {
@@ -492,6 +495,7 @@ export class App {
     this.shadows.update(dt);
     this.judgement.update(dt, this.elapsed);
     this.blades.update(dt, this.elapsed, position, this.character.height);
+    this.fx.update(dt, raw, this.elapsed);
     this._syncAbilities();
 
     const outside = P.zone === 'outside' || game.showOutside;

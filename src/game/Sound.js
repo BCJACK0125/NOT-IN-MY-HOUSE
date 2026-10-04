@@ -242,6 +242,23 @@ export class Sound {
     this.tone(big ? 55 : 85 + Math.random() * 30, big ? 1.2 : 0.6, { type: 'sawtooth', vol: big ? 0.18 : 0.08, slide: 0.7, attack: 0.08 });
     this.noise(big ? 1.1 : 0.5, { freq: big ? 220 : 380, q: 4, vol: big ? 0.25 : 0.1, attack: 0.1, sweep: 0.6 });
   }
+  /** The tell's ring: a bright ting for a swing, a low metal scrape for a slam. */
+  glint(heavy = false) {
+    if (!this._allow('glint', 2, 0.12)) return;
+    if (heavy) {
+      this.tone(620, 0.35, { type: 'triangle', vol: 0.07, slide: 0.6, vary: 0.04 });
+      this.noise(0.3, { freq: 2400, q: 8, vol: 0.05, sweep: 0.5 });
+    } else {
+      this.tone(2650, 0.22, { type: 'sine', vol: 0.06, vary: 0.05 });
+      this.tone(3975, 0.16, { type: 'sine', vol: 0.03, delay: 0.01, vary: 0.05 });
+    }
+  }
+  /** The last of a wave goes down: a deep hit under the cut. */
+  finisher() {
+    this.tone(70, 0.9, { type: 'sine', vol: 0.5, slide: 0.45 });
+    this.noise(0.5, { freq: 900, q: 0.8, vol: 0.18, sweep: 0.3 });
+    this.tone(1760, 0.9, { type: 'sine', vol: 0.05, delay: 0.08 });
+  }
   windup() {
     this.noise(0.4, { freq: 300, sweep: 4, q: 6, vol: 0.06, attack: 0.3 });
   }

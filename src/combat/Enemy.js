@@ -288,6 +288,7 @@ export class Enemy {
     this.vz = 0;
     this.speed = 0;
     this.flash = 0;
+    this.punch = 0;
     this.heat = 0;
     this.radius = 0.36 * this.size;
     this.attack = null;
@@ -397,6 +398,8 @@ export class Enemy {
       }
     }
     this.timer += dt;
+    // The hit's white flash fades on a corpse too, or the body lies there lit.
+    this.flash = Math.max(0, this.flash - dt * 6);
     // Only while it is a corpse: the timer restarts for the burn-away, and a
     // body that started bleeding again as it dissolved would be a puzzle.
     if (this.sliced && this.state === 'dead') this._bleed(dt);
@@ -454,6 +457,13 @@ export class Enemy {
     this.aiTime += dt;
     this.cooldown -= dt;
     this.flash = Math.max(0, this.flash - dt * 6);
+    // Squash on a hit: wide and short, then back with a little overshoot.
+    if (this.punch > 0) {
+      this.punch = Math.max(0, this.punch - dt * 5);
+      const u = 1 - this.punch;
+      const w = 0.1 * Math.cos(u * Math.PI * 2) * (1 - u) * (1 - u);
+      this.root.scale.set(1 + w, 1 - w * 0.9, 1 + w);
+    } else if (this.root.scale.y !== 1) this.root.scale.set(1, 1, 1);
 
     if (this.spawnFx) {
       const fx = this.spawnFx;
@@ -682,6 +692,7 @@ export class Enemy {
     this.attackAction = action;
     this.ai = 'strike';
     this.aiTime = 0;
+    this.manager.onCommit?.(this);
   }
 
   _endStrike() {
@@ -704,6 +715,7 @@ export class Enemy {
     if (!this.alive) return null;
     this.hp -= damage;
     this.flash = 1;
+    this.punch = 1;
     this.awake = true;
     if (this.spawnFx) {
       this.spawnFx = null;
@@ -745,6 +757,8 @@ export class Enemy {
 
     this.state = 'dead';
     this.timer = 0;
+    this.punch = 0;
+    this.root.scale.set(1, 1, 1);
     this.manager?.releaseToken(this);
     this.heat = 0;
     // Nothing fades. The pose the clip is on *is* the ragdoll's first frame —

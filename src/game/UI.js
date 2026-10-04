@@ -62,6 +62,20 @@ export class UI {
     $('optSound').addEventListener('change', (e) => app.sound.setMuted(!e.target.checked));
     $('optVol').addEventListener('input', (e) => app.sound.setVolume(+e.target.value));
     $('optSens').addEventListener('input', (e) => { app.cam.sensitivity = +e.target.value; });
+    // Shake, kicks, flashes and smears: some players get sick on them, so it
+    // is a dial, and it is remembered.
+    const setShake = (v) => {
+      app.cam.shakeScale = v;
+      app.fx.intensity = v;
+    };
+    try {
+      const saved = localStorage.getItem('nimh.shake');
+      if (saved !== null) { setShake(+saved); $('optShake').value = saved; }
+    } catch {}
+    $('optShake').addEventListener('input', (e) => {
+      setShake(+e.target.value);
+      try { localStorage.setItem('nimh.shake', e.target.value); } catch {}
+    });
     $('optHigh').addEventListener('change', (e) => this.setQuality(e.target.checked));
     this.el.click.addEventListener('click', () => { this.el.click.classList.add('hidden'); app.cam.lock(); });
     this.el.note.addEventListener('click', () => { if (this.noteOpen) { this.note(false); game().step?.onNoteClosed?.(game()); } });

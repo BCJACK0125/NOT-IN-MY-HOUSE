@@ -65,6 +65,13 @@ export class Game {
     enemies.onWindup = (e) => {
       if (this._near(e, 10)) app.sound.windup();
     };
+    // The swing commits: past here a dash is a perfect one. Say so.
+    enemies.onCommit = (e) => {
+      if (this.mode !== 'play' || !this._near(e, 16)) return;
+      const heavy = !!e.attack?.aoe;
+      app.fx.glint(e, heavy);
+      app.sound.glint(heavy);
+    };
     enemies.onEnemyStrike = (e, attack) => this._enemyStrike(e, attack);
 
     this.slamRing = new ShockRing({});
@@ -194,6 +201,7 @@ export class Game {
 
   goto(index, { checkpoint = false, quiet = false, place = false, retry = false } = {}) {
     this.step?.exit?.(this);
+    if (place) this.app.fx?.clear();
     this.stepIndex = index;
     this.step = this.steps[index];
     if (!this.step) return;
@@ -415,6 +423,7 @@ export class Game {
   onDodge() {
     this.app.sound.dodge();
     this.app.cam.fovKick = 6;
+    this.app.fx.dodge(false);
   }
 
   /** A player's blow lands: everyone in the arc takes it. */
@@ -431,6 +440,7 @@ export class Game {
     }
     if (!hits.length) return;
     let killed = 0;
+    const blade = attack.configKey !== 'kick';
     for (const e of hits) {
       const dx = e.position.x - pos.x;
       const dz = e.position.z - pos.z;
@@ -438,11 +448,22 @@ export class Game {
       const x = (dx / l) * 0.6 + Math.sin(facing) * 0.4;
       const z = (dz / l) * 0.6 + Math.cos(facing) * 0.4;
       const n = Math.hypot(x, z) || 1;
-      if (this.damageEnemy(e, s.damage, x / n, z / n, attack.config, 'player') === 'dead') killed++;
+      const dead = this.damageEnemy(e, s.damage, x / n, z / n, attack.config, 'player') === 'dead';
+      if (dead) killed++;
+      app.fx.hit(e, dead ? 'kill' : blade ? 'slash' : 'kick', x / n, z / n);
     }
     const cfg = attack.config;
-    app.hitStop(killed ? cfg.hitStop : cfg.hitStop * 0.6, killed ? cfg.hitStopScale : 0.12);
-    app.cam.shake(killed ? cfg.shake : cfg.shake * 0.5);
+    // The last one standing goes down in slow motion: the wave's full stop.
+    const last = killed > 0 && !this.boss?.alive && !app.enemies.enemies.some((e) => e.alive && Math.hypot(e.position.x - pos.x, e.position.z - pos.z) < 24 && Math.abs(e.position.y - pos.y) < 3);
+    if (last) {
+      app.fx.hit(hits[hits.length - 1], 'finisher', Math.sin(facing), Math.cos(facing));
+      app.hitStop(0.42, 0.16);
+      app.sound.duckMusic(0.5, 0.5);
+      app.sound.finisher();
+    } else {
+      app.hitStop(killed ? cfg.hitStop : cfg.hitStop * 0.6, killed ? cfg.hitStopScale : 0.12);
+    }
+    app.cam.shake(last ? cfg.shake * 1.6 : killed ? cfg.shake : cfg.shake * 0.5);
     if (attack.configKey === 'kick') app.sound.hit(killed > 0);
     else if (killed) app.sound.cut();
     else app.sound.hit(false);
@@ -558,6 +579,7 @@ export class Game {
     if (this._slowmo > 0) return;
     this.stats.perfect++;
     this._slowmo = 0.9;
+    app.fx.dodge(true);
     app.sound.perfect();
     this.addSpirit(18);
     this.ui.damageNumber(app.character.position.clone().setY(app.character.position.y + 2.1), '見切', 'word');
@@ -570,6 +592,7 @@ export class Game {
     this.ui.hurt(damage);
     app.sound.hurt();
     app.cam.shake(0.28);
+    app.fx.hurt(x, z, damage);
     this.combo = 0;
     this.ui.combo(0);
     const c = app.controller;
@@ -658,6 +681,8 @@ export class Game {
     this.later(1.6, () => { app.timeScale = 1; });
     app.sound.roar();
     app.cam.shake(0.6);
+    app.fx.flash(0.35, 1, 0.8, 0.6);
+    app.cam.fovKick = -10;
   }
 
   /* ------------------------------------------------------------------ */
