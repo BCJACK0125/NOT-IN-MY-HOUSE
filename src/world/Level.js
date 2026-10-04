@@ -291,7 +291,10 @@ export class Level {
       return w >= ST.zm ? base + RISE * KY * t : base + (3.0 - RISE * t) * KY;
     };
     if (n < HOME_FLOOR) world.addRegion(ST.x0 * K, 11.8 * K, 10.7 * K, 13.4 * K, flight, 'stairs');
-    else world.addFlat(ST.x0 * K, 11.8 * K, 10.7 * K, 13.4 * K, base, 'stairs');
+    // 8F: only the blocked flight up (south half) belongs to this storey. The
+    // north half is the top of 7F's flight down — a flat floor over it would
+    // hold the body at 8F height and the stairs could never be walked down.
+    else world.addRegion(ST.x0 * K, 11.8 * K, ST.zm * K, 13.4 * K, flight, 'stairs');
     if (n === 1) world.addFlat(ST.x0 * K, 11.8 * K, ST.z0 * K, ST.zm * K, base, 'lobby1');
     // A stair ceiling for the camera at 8F (nothing above is walkable).
     if (home) world.addBox(5.0 * K, 12 * K, base + FH - 0.25, base + FH + 0.2, 10.0 * K, 13.6 * K, { solid: false, cam: true, sight: false });
