@@ -103,6 +103,11 @@ export class CombatFX {
     this.trail = new SwordTrail();
     this.group.add(this.trail.mesh);
 
+    // Phones run without bloom, and without it a katana is a two-pixel line
+    // that vanishes behind the body. This stands in for the halo.
+    this.bladeGlow = app.isTouch ? new BladeGlow() : null;
+    if (this.bladeGlow) this.group.add(this.bladeGlow.mesh);
+
     this.glints = new Glints(6);
     this.group.add(this.glints.group);
 
@@ -254,6 +259,11 @@ export class CombatFX {
     const swinging = this._swinging(game);
     this.trail.update(elapsed, swinging, app.equipment?.get('sword')?.model, app.character.position, dt);
     if (this.trail.tipVel) this._tipVel.copy(this.trail.tipVel);
+    if (this.bladeGlow) {
+      const sword = app.equipment?.get('sword');
+      const lit = game.hasSword && sword?.mount.visible && app.character.root.visible && this.trail.haveBlade;
+      this.bladeGlow.update(lit, this.trail.worldBase, this.trail.worldTip, raw);
+    }
 
     // Gathered blows: the lens and the screen respond once, to the hardest.
     const p = this._pending;
@@ -336,6 +346,10 @@ class SwordTrail {
     this._lastTip = new Vector3();
     this._lastRoot = new Vector3();
     this._haveLast = false;
+    /** Where the steel is this frame, in world space (guard → point). */
+    this.worldBase = new Vector3();
+    this.worldTip = new Vector3();
+    this.haveBlade = false;
 
     const verts = TRAIL_MAX * TRAIL_SUB * 2;
     this.positions = new Float32Array(verts * 3);
@@ -462,6 +476,9 @@ class SwordTrail {
       model.updateWorldMatrix(true, false);
       const base = this._base.clone().applyMatrix4(model.matrixWorld);
       const tip = this._tip.clone().applyMatrix4(model.matrixWorld);
+      this.worldBase.copy(base);
+      this.worldTip.copy(tip);
+      this.haveBlade = true;
       if (this._haveLast && dt > 1e-5) {
         // The blade's own speed, with the body's travel taken out of it: a warp
         // carries the whole sword along and is not a swing.
@@ -539,6 +556,86 @@ class SwordTrail {
       g.attributes.aSide.needsUpdate = true;
       g.index.needsUpdate = true;
     }
+  }
+}
+
+/**
+ * A soft glow laid along the blade, facing the camera: the halo a bloom pass
+ * would have drawn, for the frames that have none. It depth-tests, so the body
+ * hides the part behind it and the rest spills past the silhouette — which is
+ * exactly how the real halo gives away a sword held on the far side.
+ */
+class BladeGlow {
+  constructor() {
+    const g = new BufferGeometry();
+    // (t along the blade, side): a little past either end, for soft caps.
+    const c = new Float32Array([-0.1, -1, 0, 1.1, -1, 0, 1.1, 1, 0, -0.1, 1, 0]);
+    g.setAttribute('position', new BufferAttribute(c, 3));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    this.material = new ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      uniforms: {
+        uBase: { value: new Vector3() },
+        uTip: { value: new Vector3() },
+        uWidth: { value: 0.11 },
+        uColor: { value: new Color('#ff6a1c') },
+        uIntensity: { value: 0 }
+      },
+      vertexShader: /* glsl */ `
+        uniform vec3 uBase;
+        uniform vec3 uTip;
+        uniform float uWidth;
+        varying vec2 vC;
+        void main() {
+          vec4 a = viewMatrix * vec4(uBase, 1.0);
+          vec4 b = viewMatrix * vec4(uTip, 1.0);
+          vec4 v = mix(a, b, position.x);
+          vec2 d = b.xy - a.xy;
+          float l = length(d);
+          vec2 n = l > 1e-4 ? vec2(-d.y, d.x) / l : vec2(1.0, 0.0);
+          v.xy += n * position.y * uWidth;
+          // Pulled a touch toward the lens so the steel itself never hides it.
+          v.xyz *= 0.985;
+          vC = position.xy;
+          gl_Position = projectionMatrix * v;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor;
+        uniform float uIntensity;
+        varying vec2 vC;
+        void main() {
+          float across = 1.0 - abs(vC.y);
+          float along = smoothstep(-0.1, 0.12, vC.x) * (1.0 - smoothstep(0.88, 1.1, vC.x));
+          float halo = across * across * along;
+          float core = pow(across, 10.0) * along;
+          vec3 c = uColor * halo * 0.75 + vec3(1.0, 0.82, 0.55) * core * 0.9;
+          gl_FragColor = vec4(c * uIntensity, 1.0);
+        }
+      `
+    });
+    this.mesh = new Mesh(g, this.material);
+    this.mesh.name = 'BladeGlow';
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 10;
+    this.mesh.layers.set(LAYER.VFX);
+    this.mesh.raycast = () => {};
+    this._k = 0;
+    this._t = 0;
+  }
+
+  update(on, base, tip, raw) {
+    this._t += raw;
+    this._k += ((on ? 1 : 0) - this._k) * Math.min(1, raw * 6);
+    const u = this.material.uniforms;
+    u.uBase.value.copy(base);
+    u.uTip.value.copy(tip);
+    // A living flicker, not a lamp.
+    const f = 0.88 + 0.08 * Math.sin(this._t * 13.1) + 0.05 * Math.sin(this._t * 29.7 + 1.3);
+    u.uIntensity.value = this._k * f;
+    this.mesh.visible = this._k > 0.01;
   }
 }
 

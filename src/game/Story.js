@@ -72,7 +72,7 @@ export function buildSteps(g) {
       chapter: '序章　電梯',
       objective: (g) => `擊退梯廳的影（剩 ${g.alive('lift')}）`,
       enter(g) {
-        app.toast.show('右鍵 / E：踢　·　Space：閃避（無敵）　·　敵人身上發出亮橘光＝要出手了', 6500);
+        app.toast.show(app.isTouch ? '「踢」攻擊　·　「閃」閃避（無敵）　·　敵人身上發出亮橘光＝要出手了' : '右鍵 / E：踢　·　Space：閃避（無敵）　·　敵人身上發出亮橘光＝要出手了', 6500);
         g.later(0.6, () => g.wakeTag('lift'));
       },
       done: (g) => g.alive('lift') === 0
@@ -406,7 +406,7 @@ export function buildSteps(g) {
         sub: '爺爺的刀。握住的瞬間，刀身燒了起來。'
       }
     ], () => {
-      app.toast.show('取得「爺爺的刀」：左鍵 / R 斬　·　Q 滑斬突進　·　連按可以連段', 6000);
+      app.toast.show(app.isTouch ? '取得「爺爺的刀」：「斬」攻擊　·　「滑」滑斬突進　·　連按可以連段' : '取得「爺爺的刀」：左鍵 / R 斬　·　Q 滑斬突進　·　連按可以連段', 6000);
     }, { letterbox: true });
   }
 

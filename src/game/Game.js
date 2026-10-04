@@ -515,10 +515,10 @@ export class Game {
     this.spirit = Math.min(100, this.spirit + n);
     if (before < 40 && this.spirit >= 40 && !this.flags.toldJudgement) {
       this.flags.toldJudgement = true;
-      this.app.toast.show('氣已滿 40：按 C 標記敵人，召喚「天罰」', 4200);
+      this.app.toast.show(this.app.isTouch ? '氣已滿 40：按「罰」標記敵人，召喚「天罰」' : '氣已滿 40：按 C 標記敵人，召喚「天罰」', 4200);
     } else if (before < 60 && this.spirit >= 60 && !this.flags.toldShadows) {
       this.flags.toldShadows = true;
-      this.app.toast.show('氣已滿 60：按 V 標記兩個敵人，放出「影分身」', 4200);
+      this.app.toast.show(this.app.isTouch ? '氣已滿 60：按「影」標記兩個敵人，放出「影分身」' : '氣已滿 60：按 V 標記兩個敵人，放出「影分身」', 4200);
     }
   }
 
