@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#07080b" />
+    <title>NOT IN MY HOUSE</title>
+    <meta name="description" content="末日之夜，從電梯殺出一條血路：我家、樓梯間、樓外廣場。瀏覽器 3D 動作遊戲。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2307080b'/%3E%3Cpath d='M6 16 16 7l10 9v10H6z' fill='none' stroke='%23ff5a1e' stroke-width='2.5'/%3E%3Cpath d='M9 25 23 11' stroke='%23ffd27a' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@700;900&family=Oswald:wght@500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/ui/styles.css" />
+    <link rel="stylesheet" href="./src/ui/game.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+
+    <!-- loading veil -->
+    <div id="loader" class="loader">
+      <div class="loader__inner">
+        <h1 class="loader__title brand">NOT IN MY HOUSE</h1>
+        <div class="loader__bar"><i id="loader-fill"></i></div>
+        <p class="loader__status" id="loader-status">準備中…</p>
+      </div>
+    </div>
+
+    <!-- title -->
+    <div id="title" class="screen hidden">
+      <div class="title__glow"></div>
+      <div class="title__inner">
+        <p class="title__kicker">2026．黑雨之夜</p>
+        <h1 class="brand brand--big">NOT IN<br />MY HOUSE</h1>
+        <p class="title__tag">這是我家。滾出去。</p>
+        <div class="title__buttons">
+          <button id="btnStart" class="btn btn--primary">開始遊戲</button>
+          <button id="btnContinue" class="btn hidden">從檢查點繼續</button>
+          <button id="btnSkipIntro" class="btn">直接開始（跳過前導片）</button>
+          <button id="btnHelp" class="btn btn--ghost">操作說明</button>
+        </div>
+        <div class="title__opts">
+          <label><input type="checkbox" id="optSound" checked /> 音效與音樂</label>
+          <label><input type="checkbox" id="optHigh" /> 高畫質</label>
+          <label>難度
+            <select id="optDiff">
+              <option value="0.7">回家（簡單）</option>
+              <option value="1" selected>守家（普通）</option>
+              <option value="1.45">血路（困難）</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <p class="title__foot">場景重建自真實的家 · 以 three.js 製作 · 建議使用桌機 Chrome / Edge</p>
+    </div>
+
+    <!-- controls -->
+    <div id="help" class="screen screen--dim hidden">
+      <div class="card">
+        <h2>操作</h2>
+        <table class="keys">
+          <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>移動（<kbd>Shift</kbd> 奔跑）</td></tr>
+          <tr><td>滑鼠</td><td>轉動視角（滾輪拉遠拉近）</td></tr>
+          <tr><td><kbd>左鍵</kbd> / <kbd>R</kbd></td><td>斬（需要刀）— 連按可以連段</td></tr>
+          <tr><td><kbd>右鍵</kbd> / <kbd>E</kbd></td><td>踢</td></tr>
+          <tr><td><kbd>Q</kbd></td><td>滑斬：遠距離突進</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>閃避（無敵）— 在敵人出手瞬間閃開觸發「見切」</td></tr>
+          <tr><td><kbd>F</kbd></td><td>互動：開門、撿東西、看紙條</td></tr>
+          <tr><td><kbd>V</kbd> / <kbd>C</kbd> / <kbd>X</kbd></td><td>奧義：影分身 / 天罰 / 萬劍（消耗「氣」）</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>暫停</td></tr>
+        </table>
+        <p class="card__note">敵人發出亮橘光就是要出手了。一次最多兩個會同時攻擊你，其他的會在旁邊繞——看準時機。</p>
+        <button class="btn btn--primary" data-close>知道了</button>
+      </div>
+    </div>
+
+    <!-- in-game HUD -->
+    <div id="game-hud" class="ghud hidden">
+      <div class="vitals">
+        <div class="vitals__name">你</div>
+        <div class="bar bar--hp"><i id="hpFill"></i><b id="hpGhost"></b></div>
+        <div class="bar bar--sp"><i id="spFill"></i></div>
+        <div class="vitals__sp"><span id="spText">氣 0</span></div>
+      </div>
+      <div class="objective">
+        <div class="objective__chapter" id="objChapter"></div>
+        <div class="objective__text" id="objText"></div>
+      </div>
+      <div class="meta">
+        <div class="meta__floor" id="floorText">8F</div>
+        <div class="meta__kills"><span id="killText">0</span> 擊倒</div>
+      </div>
+      <div class="combo" id="combo"><b id="comboNum">0</b><span>連擊</span></div>
+      <div class="bossbar hidden" id="bossbar"><span id="bossName">黑潮之母</span><div class="bar bar--boss"><i id="bossFill"></i></div></div>
+      <div class="prompt hidden" id="prompt"><kbd id="promptKey">F</kbd><span id="promptText"></span></div>
+      <div class="crosshair" id="crosshair"></div>
+    </div>
+    <div id="subtitle" class="subtitle"></div>
+    <div id="chapterCard" class="chapter-card"><small></small><b></b></div>
+    <div id="vignette" class="vignette"></div>
+    <div id="slowmo" class="slowmo"></div>
+    <div id="dmg" class="dmg-layer"></div>
+    <div class="letterbox" id="letterbox"><i></i><i></i></div>
+    <div id="skipHint" class="skip-hint hidden">按住 <kbd>Enter</kbd> / <kbd>Esc</kbd> 跳過</div>
+    <div id="fade" class="fade"></div>
+    <div id="titleCard" class="title-card"><h1 class="brand brand--big">NOT IN<br />MY HOUSE</h1><p>這是我家。滾出去。</p></div>
+
+    <!-- note from mum -->
+    <div id="note" class="screen screen--dim hidden">
+      <div class="paper">
+        <p>先走了，</p>
+        <p>在樓下廣場的救援車等你。</p>
+        <p>樓梯間很危險，小心。</p>
+        <p>一定要來。</p>
+        <p class="paper__sign">— 媽</p>
+      </div>
+      <p class="screen__hint">按任意鍵繼續</p>
+    </div>
+
+    <!-- pause -->
+    <div id="pause" class="screen screen--dim hidden">
+      <div class="card card--menu">
+        <h2>暫停</h2>
+        <button class="btn btn--primary" id="btnResume">繼續</button>
+        <button class="btn" id="btnRetry">從檢查點重來</button>
+        <button class="btn" id="btnPauseHelp">操作說明</button>
+        <label class="slider">滑鼠靈敏度 <input type="range" id="optSens" min="0.3" max="2.2" step="0.1" value="1" /></label>
+        <label class="slider">音量 <input type="range" id="optVol" min="0" max="1" step="0.05" value="0.8" /></label>
+        <button class="btn btn--ghost" id="btnQuit">回到標題</button>
+      </div>
+    </div>
+
+    <!-- game over -->
+    <div id="gameover" class="screen screen--red hidden">
+      <h2 class="big-word">你倒下了</h2>
+      <p id="deathLine">家，還沒守住。</p>
+      <button class="btn btn--primary" id="btnRevive">從檢查點再站起來</button>
+    </div>
+
+    <!-- ending -->
+    <div id="ending" class="screen screen--dawn hidden">
+      <div class="ending__inner">
+        <p class="ending__kicker">天亮了</p>
+        <h2 class="brand">NOT IN MY HOUSE</h2>
+        <div class="ending__stats" id="stats"></div>
+        <p class="ending__line">家人平安。城市還在燒，但這一夜，我守住了回家的路。</p>
+        <button class="btn btn--primary" id="btnAgain">再玩一次</button>
+      </div>
+    </div>
+
+    <!-- click to lock the mouse -->
+    <div id="clickToPlay" class="click-to-play hidden">點一下畫面繼續</div>
+
+    <!-- touch -->
+    <div id="touch" class="touch hidden">
+      <div class="touch__stick" id="stick"><i></i></div>
+      <div class="touch__buttons">
+        <button data-t="slashHit" class="tb tb--big">斬</button>
+        <button data-t="kick" class="tb">踢</button>
+        <button data-t="crouchSlash" class="tb">滑</button>
+        <button data-t="dodge" class="tb">閃</button>
+        <button data-t="use" class="tb tb--use">F</button>
+        <button data-t="pause" class="tb tb--pause">❚❚</button>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
