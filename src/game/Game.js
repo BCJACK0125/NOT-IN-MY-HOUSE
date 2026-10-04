@@ -648,32 +648,10 @@ export class Game {
       if (e.code === 'Escape' && this.mode === 'play') { this.pause(true); return; }
       if (this.mode !== 'play' || e.repeat) return;
       const app = this.app;
-      const flying = app.character.flight?.active;
       if (e.code === 'Space' && app.character.flight?.flying) { e.preventDefault(); app._loose(); return; }
-      if (e.code === 'KeyV' && !flying) {
-        if (app.shadows.active) return;
-        if (app.marking.active) { app.marking.cancel(); return; }
-        if (this.spirit < 60) { app.toast.show('氣不足（影分身需要 60）'); return; }
-        app.judgeMarking.end();
-        app.marking.begin();
-        app.toast.show('把準心對準敵人，左鍵標記 2 個', 3000);
-      }
-      if (e.code === 'KeyC' && !flying) {
-        if (app.judgement.active) return;
-        if (app.judgeMarking.active) { app.judgeMarking.cancel(); return; }
-        if (this.spirit < 40) { app.toast.show('氣不足（天罰需要 40）'); return; }
-        app.marking.end();
-        app.judgeMarking.begin();
-        app.toast.show('把準心對準敵人，左鍵標記', 3000);
-      }
-      if (e.code === 'KeyX') {
-        if (flying) { app._toggleFlight(); return; }
-        if (!this.hasSword) { app.toast.show('需要刀'); return; }
-        if (app.enemies.player.zone !== 'outside') { app.toast.show('萬劍只能在戶外施展'); return; }
-        if (this.spirit < 100) { app.toast.show('氣不足（萬劍需要 100）'); return; }
-        this.spirit = 0;
-        app._toggleFlight();
-      }
+      if (e.code === 'KeyV') this.ability('shadows');
+      if (e.code === 'KeyC') this.ability('judgement');
+      if (e.code === 'KeyX') this.ability('flight');
     });
     window.addEventListener('keyup', (e) => {
       if (e.code === 'Enter' || e.code === 'Escape' || e.code === 'Space') this._skipHeld = false;
@@ -686,6 +664,38 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.mode === 'play') this.pause(true);
     });
+  }
+
+  /** V / C / X, from the keyboard or the touch buttons. */
+  ability(id) {
+    const app = this.app;
+    if (this.mode !== 'play') return;
+    const flying = app.character.flight?.active;
+    const aim = app.isTouch ? '把準心（畫面中央）對準敵人，點一下畫面標記' : '把準心對準敵人，左鍵標記';
+    if (id === 'shadows' && !flying) {
+      if (app.shadows.active) return;
+      if (app.marking.active) { app.marking.cancel(); return; }
+      if (this.spirit < 60) { app.toast.show('氣不足（影分身需要 60）'); return; }
+      app.judgeMarking.end();
+      app.marking.begin();
+      app.toast.show(`${aim}（2 個）`, 3000);
+    }
+    if (id === 'judgement' && !flying) {
+      if (app.judgement.active) return;
+      if (app.judgeMarking.active) { app.judgeMarking.cancel(); return; }
+      if (this.spirit < 40) { app.toast.show('氣不足（天罰需要 40）'); return; }
+      app.marking.end();
+      app.judgeMarking.begin();
+      app.toast.show(aim, 3000);
+    }
+    if (id === 'flight') {
+      if (flying) { app._toggleFlight(); return; }
+      if (!this.hasSword) { app.toast.show('需要刀'); return; }
+      if (app.enemies.player.zone !== 'outside') { app.toast.show('萬劍只能在戶外施展'); return; }
+      if (this.spirit < 100) { app.toast.show('氣不足（萬劍需要 100）'); return; }
+      this.spirit = 0;
+      app._toggleFlight();
+    }
   }
 
   pause(on) {

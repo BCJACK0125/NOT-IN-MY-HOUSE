@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#07080b" />
     <title>NOT IN MY HOUSE</title>
     <meta name="description" content="末日之夜，從電梯殺出一條血路：我家、樓梯間、樓外廣場。瀏覽器 3D 動作遊戲。" />
@@ -76,6 +76,15 @@
           <tr><td><kbd>V</kbd> / <kbd>C</kbd> / <kbd>X</kbd></td><td>奧義：影分身 / 天罰 / 萬劍（消耗「氣」）</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>暫停</td></tr>
         </table>
+        <table class="keys keys--touch">
+          <tr><td>左下搖桿</td><td>移動（推到底＝奔跑）</td></tr>
+          <tr><td>右半邊拖曳</td><td>轉動視角</td></tr>
+          <tr><td>斬 / 踢 / 滑</td><td>攻擊（斬與滑需要刀）</td></tr>
+          <tr><td>閃</td><td>閃避（無敵）</td></tr>
+          <tr><td>F</td><td>互動（亮起時可以用）</td></tr>
+          <tr><td>影 / 罰 / 劍</td><td>奧義；標記敵人時點一下畫面</td></tr>
+          <tr><td>過場動畫</td><td>點右下「跳過」</td></tr>
+        </table>
         <p class="card__note">敵人發出亮橘光就是要出手了。一次最多兩個會同時攻擊你，其他的會在旁邊繞——看準時機。</p>
         <button class="btn btn--primary" data-close>知道了</button>
       </div>
@@ -108,7 +117,7 @@
     <div id="slowmo" class="slowmo"></div>
     <div id="dmg" class="dmg-layer"></div>
     <div class="letterbox" id="letterbox"><i></i><i></i></div>
-    <div id="skipHint" class="skip-hint hidden">按住 <kbd>Enter</kbd> / <kbd>Esc</kbd> 跳過</div>
+    <div id="skipHint" class="skip-hint hidden"><span class="skip-hint__keys">按住 <kbd>Enter</kbd> / <kbd>Esc</kbd> 跳過</span><button class="skip-hint__btn">跳過 ▸▸</button></div>
     <div id="fade" class="fade"></div>
     <div id="titleCard" class="title-card"><h1 class="brand brand--big">NOT IN<br />MY HOUSE</h1><p>這是我家。滾出去。</p></div>
 
@@ -161,14 +170,26 @@
     <!-- touch -->
     <div id="touch" class="touch hidden">
       <div class="touch__stick" id="stick"><i></i></div>
-      <div class="touch__buttons">
-        <button data-t="slashHit" class="tb tb--big">斬</button>
-        <button data-t="kick" class="tb">踢</button>
-        <button data-t="crouchSlash" class="tb">滑</button>
-        <button data-t="dodge" class="tb">閃</button>
-        <button data-t="use" class="tb tb--use">F</button>
-        <button data-t="pause" class="tb tb--pause">❚❚</button>
+      <div class="touch__abilities">
+        <button data-t="shadows" class="ta" data-cost="60">影</button>
+        <button data-t="judgement" class="ta" data-cost="40">罰</button>
+        <button data-t="flight" class="ta" data-cost="100">劍</button>
       </div>
+      <div class="touch__buttons">
+        <button data-t="crouchSlash" class="tb">滑</button>
+        <button data-t="kick" class="tb">踢</button>
+        <button data-t="slashHit" class="tb tb--big">斬</button>
+        <button data-t="use" class="tb tb--use">F</button>
+        <button data-t="dodge" class="tb tb--dodge">閃</button>
+      </div>
+      <button data-t="pause" class="tb tb--pause">❚❚</button>
+    </div>
+
+    <!-- phones held upright -->
+    <div id="rotate" class="rotate hidden">
+      <div class="rotate__phone"></div>
+      <p>請把手機<b>橫過來</b>玩</p>
+      <small>遊戲會在轉向後繼續</small>
     </div>
 
     <script type="module" src="./src/main.js"></script>

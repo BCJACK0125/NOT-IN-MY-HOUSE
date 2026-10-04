@@ -62,6 +62,15 @@ Object.assign(settings.crouchSlash, { range: 8.0, maxWarp: 6.5, cancelAt: 0.8 })
 settings.shadowCharacter.marking.range = 22;
 settings.judgement.marking.range = 26;
 settings.enemies.ragdoll.friction = 0.7;
+if (isTouch) {
+  // Phones: the same game, a lighter frame.
+  Object.assign(settings.post, { bloomStrength: 0, grain: 0 });
+  Object.assign(settings.groundFog, { count: 50 });
+  Object.assign(settings.leaves.drift, { count: 50 });
+  Object.assign(settings.leaves.litter, { perCell: 4 });
+  settings.environment.shadowExtent = 18;
+  settings.targetRing.hotkeys.enabled = false;
+}
 
 /**
  * Builds every system and runs the frame. Story, rules and UI live in
@@ -89,6 +98,7 @@ export class App {
     Object.defineProperty(this.rig, 'azimuth', { get: () => this.cam.azimuth });
 
     this.environment = new Environment(this.renderer, this.camera);
+    if (isTouch) this.environment.sun.shadow.mapSize.set(1024, 1024);
     this.scene = this.environment.scene;
 
     /* ---- outside ---- */
@@ -99,7 +109,7 @@ export class App {
     this.ground = new Ground(this.environment, { terrain: this.terrain, atmosphere: this.atmosphere });
     this.groundFog = new GroundFog({ terrain: this.terrain, cache: this.ground.cache, atmosphere: this.atmosphere });
     this.leaves = new Leaves({ terrain: this.terrain, cache: this.ground.cache, environment: this.environment, atmosphere: this.atmosphere });
-    this.contactShadows = new ContactShadows(this.renderer, { size: 2.6, height: 2.4, blur: 2.0 });
+    this.contactShadows = new ContactShadows(this.renderer, { size: 2.6, height: 2.4, blur: 2.0, resolution: isTouch ? 128 : 256 });
     this.scene.add(this.sky.mesh, this.moon.mesh, this.ground.mesh, this.groundFog.mesh, this.leaves.group, this.contactShadows.group);
 
     /* ---- the building ---- */
@@ -309,7 +319,7 @@ export class App {
     for (const move of this.character.attacks ?? []) move.cancel();
     flight.start();
     this.flightMarking.begin();
-    this.toast.show('萬劍：對準敵人點左鍵鍛劍 · Space 齊射 · X 落地', 3500);
+    this.toast.show(this.isTouch ? '萬劍：對準敵人點畫面鍛劍 · 「閃」齊射 · 「劍」落地' : '萬劍：對準敵人點左鍵鍛劍 · Space 齊射 · X 落地', 3500);
   }
 
   _forgeBlade(enemy) {

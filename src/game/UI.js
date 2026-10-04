@@ -32,9 +32,10 @@ export class UI {
     const app = this.app;
     const game = () => app.game;
     const click = (id, fn) => $(id).addEventListener('click', (e) => { e.stopPropagation(); app.sound.init(); fn(); });
-    click('btnStart', () => game().newGame({ intro: true }));
-    click('btnSkipIntro', () => game().newGame({ intro: false }));
-    click('btnContinue', () => game().continueFromSave());
+    click('btnStart', () => { this.landscape(); game().newGame({ intro: true }); });
+    click('btnSkipIntro', () => { this.landscape(); game().newGame({ intro: false }); });
+    click('btnContinue', () => { this.landscape(); game().continueFromSave(); });
+    this.el.skip.querySelector('.skip-hint__btn').addEventListener('click', (e) => { e.stopPropagation(); game().cine.skip(); });
     click('btnHelp', () => this.el.help.classList.remove('hidden'));
     click('btnPauseHelp', () => this.el.help.classList.remove('hidden'));
     this.el.help.querySelector('[data-close]').addEventListener('click', () => this.el.help.classList.add('hidden'));
@@ -58,11 +59,26 @@ export class UI {
     this.hud(false);
   }
 
+  /** Phones: fullscreen and lock to landscape where allowed (Android); iOS gets the overlay. */
+  landscape() {
+    if (!this.app.isTouch) return;
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    const lock = () => { try { const p = screen.orientation?.lock?.('landscape'); p?.catch?.(() => {}); } catch { /* unsupported */ } };
+    try {
+      if (req && !document.fullscreenElement) {
+        const p = req.call(el, { navigationUI: 'hide' });
+        if (p?.then) p.then(lock, () => {}); else lock();
+      } else lock();
+    } catch { /* ignore */ }
+    setTimeout(() => this._checkRotate?.(), 300);
+  }
+
   setQuality(high) {
     const r = this.app.renderer;
     r.targetPixelRatio = () => Math.min(window.devicePixelRatio || 1, high ? 1.75 : this.app.isTouch ? 1 : 1.25);
     settings.post.samples = high ? 4 : 0;
-    settings.groundFog.count = high ? 160 : 110;
+    settings.groundFog.count = this.app.isTouch ? (high ? 80 : 50) : high ? 160 : 110;
     r.handleResize();
   }
 
@@ -164,6 +180,7 @@ export class UI {
     this._last.prompt = text;
     this.el.prompt.classList.toggle('hidden', !text);
     if (text) this.el.promptText.textContent = text;
+    this._useBtn?.classList.toggle('ready', !!text);
   }
   combo(n) {
     this.el.combo.classList.toggle('on', n >= 2);
@@ -210,6 +227,14 @@ export class UI {
       el.spText.textContent = `氣 ${sp}`;
       el.sp.parentElement.classList.toggle('is-full', sp >= 100);
     }
+    if (this._abilityBtns && game.mode === 'play') {
+      const sp = game.spirit;
+      for (const b of this._abilityBtns) {
+        const need = +b.dataset.cost;
+        const off = sp < need || (b.dataset.t === 'flight' && !game.canFly() && !this.app.character.flight?.active);
+        if (b._off !== off) { b._off = off; b.classList.toggle('off', off); }
+      }
+    }
     const floor = game.floorLabel();
     if (this._last.floor !== floor) { this._last.floor = floor; el.floor.textContent = floor; }
     if (this._last.kills !== game.stats.kills) { this._last.kills = game.stats.kills; el.kills.textContent = game.stats.kills; }
@@ -247,6 +272,8 @@ export class UI {
   /* ---- touch ------------------------------------------------------ */
   _touch() {
     document.body.classList.add('touch-ui');
+    const foot = document.querySelector('.title__foot');
+    if (foot) foot.textContent = '手機請橫放遊玩 · 第一次載入約 35 MB，建議使用 Wi-Fi';
     const app = this.app;
     const stick = $('stick');
     const knob = stick.querySelector('i');
@@ -256,7 +283,7 @@ export class UI {
       const r = stick.getBoundingClientRect();
       sx = r.left + r.width / 2;
       sy = r.top + r.height / 2;
-      stick.setPointerCapture(sid);
+      try { stick.setPointerCapture(sid); } catch { /* synthetic pointer */ }
     });
     stick.addEventListener('pointermove', (e) => {
       if (e.pointerId !== sid) return;
@@ -278,14 +305,33 @@ export class UI {
     };
     stick.addEventListener('pointerup', end);
     stick.addEventListener('pointercancel', end);
+    this._useBtn = document.querySelector('#touch [data-t="use"]');
+    this._abilityBtns = [...document.querySelectorAll('#touch .ta')];
     for (const b of document.querySelectorAll('#touch [data-t]')) {
       b.addEventListener('pointerdown', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const t = b.dataset.t;
-        if (t === 'pause') app.game.pause(true);
+        const g = app.game;
+        if (t === 'pause') g.pause(true);
+        else if (t === 'shadows' || t === 'judgement' || t === 'flight') g.ability(t);
+        else if (t === 'dodge' && app.character.flight?.flying) app._loose();
+        else if (t === 'use' && this.noteOpen) { this.note(false); g.step?.onNoteClosed?.(g); }
         else app.input.press(t);
       });
     }
+    // Holding the phone upright: cover the screen and hold the game.
+    const portrait = matchMedia('(orientation: portrait)');
+    const check = () => {
+      const g = app.game;
+      const show = portrait.matches && g && g.mode !== 'title' && g.mode !== 'loading';
+      $('rotate').classList.toggle('hidden', !show);
+      if (show && g.mode === 'play' && !app.paused) { this._rotatePaused = true; app.paused = true; }
+      if (!show && this._rotatePaused) { this._rotatePaused = false; if (!this.el.pause.classList.contains('hidden')) return; app.paused = false; }
+    };
+    portrait.addEventListener?.('change', check);
+    window.addEventListener('resize', check);
+    this._checkRotate = check;
     // drag anywhere else to look
     let lid = null, lx = 0, ly = 0;
     app.canvas.addEventListener('pointerdown', (e) => { if (lid === null) { lid = e.pointerId; lx = e.clientX; ly = e.clientY; } });
